@@ -4,11 +4,13 @@ const crypto = require('crypto');
 const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
 const config = require('./config');
 
-const BRAND = hex('#49229D');
-const BRAND_LIGHT = hex('#8B36FE');
-const GRAY = hex('#3B3B3B');
-const MID_GRAY = hex('#8A8A8A');
-const RULE = hex('#E8E8E8');
+// LangSync design tokens (--ls-brand-ink, --ls-brand, --ls-ink, --ls-muted, --ls-line).
+const BRAND = hex('#0B64A8');
+const BRAND_LIGHT = hex('#0099FF');
+const INK = hex('#0B1220');
+const GRAY = hex('#3B4350');
+const MID_GRAY = hex('#5B6472');
+const RULE = hex('#E9EDF3');
 
 function hex(color) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(color || '').trim());
@@ -213,7 +215,9 @@ class Writer {
     this.page = this.doc.addPage([612, 792]);
     this.pages.push(this.page);
     this.y = 792 - this.margin;
-    this.page.drawRectangle({ x: 0, y: 792 - 6, width: 612, height: 6, color: BRAND });
+    // Two-tone bar echoing the LangSync blue-to-violet gradient.
+    this.page.drawRectangle({ x: 0, y: 792 - 6, width: 306, height: 6, color: hex('#128EFE') });
+    this.page.drawRectangle({ x: 306, y: 792 - 6, width: 306, height: 6, color: hex('#9135FC') });
     this.page.drawText(this.fonts.clean(this.header), { x: this.margin, y: 792 - 28, size: 8, font: this.fonts.bold, color: MID_GRAY });
     this.y = 792 - 52;
   }
@@ -278,8 +282,8 @@ const ROLE_LABEL = { signer: 'Needs to sign', approver: 'Needs to approve', cc: 
 async function addCertificate(doc, fonts, { envelope, owner, documents, recipients, events, notes, images }) {
   const w = new Writer(doc, fonts, `${config.appName} · Certificate of Completion · Envelope ${envelope.id}`);
   const { bold, font } = fonts;
-  w.text('Certificate of Completion', { size: 22, font: bold, color: BRAND, gap: 8 });
-  w.text(`${envelope.title}`, { size: 13, font: bold, color: hex('#111111'), gap: 10 });
+  w.text('Certificate of Completion', { size: 22, font: bold, color: INK, gap: 8 });
+  w.text(`${envelope.title}`, { size: 13, font: bold, color: BRAND, gap: 10 });
   w.row([{ text: 'Envelope ID', width: 120 }, { text: envelope.id, width: 396 }], { font: bold });
   w.row([{ text: 'Status', width: 120 }, { text: envelope.status === 'completed' ? 'Completed' : envelope.status, width: 396 }]);
   w.row([{ text: 'Sender', width: 120 }, { text: `${owner.name} <${owner.email}>`, width: 396 }]);
@@ -299,7 +303,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
   for (const r of recipients) {
     const sigImg = r.signature_image ? await embedDataUrl(doc, r.signature_image, images) : null;
     w.ensure(sigImg ? 96 : 70);
-    w.text(`${r.name} <${r.email}>`, { size: 10, font: bold, color: hex('#111111'), gap: 3 });
+    w.text(`${r.name} <${r.email}>`, { size: 10, font: bold, color: INK, gap: 3 });
     w.text(`${ROLE_LABEL[r.role] || r.role} · Routing order ${r.routing_order} · Status: ${r.status}`, { size: 8.5, gap: 3 });
     const auth = r.access_code ? 'Email link + access code' : 'Email link';
     w.text(`Authentication: ${auth}`, { size: 8.5, gap: 3 });

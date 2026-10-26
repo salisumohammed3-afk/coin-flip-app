@@ -59,7 +59,7 @@ export function toast(message, { type = 'info', timeout = 4200, action } = {}) {
 export function modal({ title, wide = false, render, dismissable = true }) {
   return new Promise((resolve) => {
     const wrap = el(html`<div class="modal-backdrop"><div class="modal ${wide ? 'modal-wide' : ''}" role="dialog" aria-modal="true" aria-label="${title}">
-      <div class="modal-head"><h2>${title}</h2>${raw(dismissable ? '<button class="icon-btn modal-x" aria-label="Close">✕</button>' : '')}</div>
+      <div class="modal-head"><h2>${title}</h2>${raw(dismissable ? '<button class="icon-btn modal-x" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>' : '')}</div>
       <div class="modal-body"></div></div></div>`);
     const close = (value) => {
       wrap.remove();
@@ -153,7 +153,7 @@ export const pill = (map, key) => {
   return raw(html`<span class="pill pill-${s.cls}">${s.label}</span>`);
 };
 
-export const RECIPIENT_COLORS = ['#8B36FE', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#EC4899', '#6366F1', '#14B8A6'];
+export const RECIPIENT_COLORS = ['#0099FF', '#9135FC', '#F59E0B', '#10B981', '#EF4444', '#EC4899', '#06B6D4', '#6366F1'];
 
 export function debounce(fn, ms) {
   let t;

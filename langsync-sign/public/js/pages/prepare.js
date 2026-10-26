@@ -4,6 +4,7 @@ import { go, state } from '../app.js';
 import { renderDocuments, findPage, placeBox, FIELD_TYPES } from '../viewer.js';
 import { Markup, markupToolbar } from '../markup.js';
 import { stepsBar } from './edit.js';
+import { icon } from '../icons.js';
 
 const REF_WIDTH = 816; // default field sizes are in px on a US Letter page at 96dpi
 let seq = 0;
@@ -24,7 +25,7 @@ export async function renderPrepare(view, id) {
     <div class="topbar">
       <div><div class="t-title">${env.title}</div><div class="save-state" data-saved>All changes saved</div></div>
       <div class="spacer"></div>${raw(stepsBar(env, 'prepare'))}<div class="spacer"></div>
-      <button class="btn ghost" data-back>← Back</button><button class="btn primary" data-next>Next →</button>
+      <button class="btn ghost" data-back>${raw(icon('arrowLeft', 17))}Back</button><button class="btn primary" data-next>Next${raw(icon('arrowRight', 17))}</button>
     </div>
     <div class="stage-wrap">
       <aside class="palette">
@@ -33,7 +34,7 @@ export async function renderPrepare(view, id) {
           <h3>Recipient</h3>
           <div class="rcp-select">${raw(signers.map((r) => html`<button class="rcp-opt ${r.id === current ? 'on' : ''}" style="--c:${r.color}" data-rcp="${r.id}"><span class="sw"></span><span><div>${r.name || 'Unnamed'}</div><div class="muted small">${ROLE_LABEL[r.role]}</div></span></button>`).join(''))}</div>
           <h3>Drag fields onto the page</h3>
-          <div data-palette>${raw(Object.entries(FIELD_TYPES).map(([type, t]) => html`<button class="pal-item" data-type="${type}"><span class="ic">${t.icon}</span>${t.label}</button>`).join(''))}</div>
+          <div data-palette>${raw(Object.entries(FIELD_TYPES).map(([type, t]) => html`<button class="pal-item" data-type="${type}"><span class="ic">${raw(t.svg ? icon(t.svg, 15) : t.icon)}</span>${t.label}</button>`).join(''))}</div>
           <p class="muted small">Tip: click a field type, then click on the page to drop it. Drag to move, use the corner to resize, and press Delete to remove.</p>
         </div>
         <div data-pane="markup" hidden>
@@ -181,12 +182,12 @@ export async function renderPrepare(view, id) {
         const mine = fields.filter((f) => f.recipient_id === r.id);
         const hasSig = mine.some((f) => f.type === 'signature');
         return html`<div class="rcp-opt" style="--c:${r.color};cursor:default"><span class="sw"></span><span style="flex:1"><div>${r.name}</div>
-          <div class="muted small">${mine.length} field${mine.length === 1 ? '' : 's'}${raw(r.role === 'signer' && !hasSig ? ' · <span style="color:var(--red)">needs a signature</span>' : '')}</div></span></div>`;
+          <div class="muted small">${mine.length} field${mine.length === 1 ? '' : 's'}${raw(r.role === 'signer' && !hasSig ? ' · <span style="color:var(--ls-bad)">needs a signature</span>' : '')}</div></span></div>`;
       }).join('');
       const marks = markup.mine().length;
       props.innerHTML = html`<h3>Summary</h3><div class="rcp-select">${raw(counts)}</div>
         <p class="muted small" style="margin-top:14px">${marks} markup item${marks === 1 ? '' : 's'} added.</p>
-        <div class="callout small" style="margin-top:14px">Select a field to change who fills it, whether it's required, or its label.</div>`;
+        <div class="callout small" style="margin-top:14px">${raw(icon('sparkles', 16))}<span>Select a field to change who fills it, whether it's required, or its label.</span></div>`;
       return;
     }
     const f = selected;
@@ -194,7 +195,7 @@ export async function renderPrepare(view, id) {
       <label class="field"><span>Recipient</span><select data-p="recipient">${raw(signers.map((r) => html`<option value="${r.id}" ${r.id === f.recipient_id ? 'selected' : ''}>${r.name}</option>`).join(''))}</select></label>
       ${raw(['signature', 'date_signed', 'email'].includes(f.type) ? '' : html`<label class="check"><input type="checkbox" data-p="required" ${f.required ? 'checked' : ''}><span>Required</span></label>`)}
       ${raw(['text', 'company', 'title', 'full_name', 'checkbox'].includes(f.type) ? html`<label class="field"><span>Label / tooltip</span><input type="text" data-p="label" value="${f.label}" maxlength="120" placeholder="${f.type === 'checkbox' ? 'e.g. I agree to the terms' : 'e.g. Company number'}"></label>` : '')}
-      <div class="actions-row"><button class="btn ghost small" data-dup>Duplicate</button><button class="btn ghost small" data-del style="color:var(--red)">Delete</button></div>
+      <div class="actions-row"><button class="btn ghost small" data-dup>Duplicate</button><button class="btn ghost small danger-text" data-del>Delete</button></div>
       <p class="muted small" style="margin-top:14px">${f.type === 'date_signed' ? 'Filled in automatically with the date the recipient signs.' : f.type === 'email' ? 'Filled in automatically with the recipient\'s email.' : f.type === 'full_name' ? 'Pre-filled with the recipient\'s name.' : ''}</p>`;
     props.querySelector('[data-p=recipient]').onchange = (e) => { f.recipient_id = e.target.value; drawField(f); saveFields(); };
     props.querySelector('[data-p=required]')?.addEventListener('change', (e) => { f.required = e.target.checked; drawField(f); saveFields(); });

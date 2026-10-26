@@ -3,6 +3,9 @@ import { api, html, raw, el, toast, fmtDate, modal, confirmDialog, ROLE_LABEL } 
 import { renderDocuments, findPage, placeBox, FIELD_TYPES } from './viewer.js';
 import { Markup, markupToolbar } from './markup.js';
 import { adoptSignature } from './signature.js';
+import { icon } from './icons.js';
+
+const LOCKUP = '<img class="lockup" src="/img/lockup.png" alt="LangSync" style="height:26px">';
 
 const app = document.getElementById('app');
 const token = location.pathname.split('/s/')[1]?.replace(/\/$/, '');
@@ -22,7 +25,7 @@ async function load() {
   try {
     data = await api('GET', base);
   } catch (err) {
-    return card('🔗', 'This link is not valid', err.message);
+    return card('alert', 'This link is not valid', err.message, '', 'bad');
   }
   document.title = `${data.envelope.title} · LangSync Sign`;
   if (data.needsCode) return renderCode(data);
@@ -31,22 +34,22 @@ async function load() {
   const { mode, envelope, owner, recipient } = data;
   if (mode === 'closed') {
     const what = envelope.status === 'voided' ? `was voided by ${owner.name}${envelope.void_reason ? `: “${envelope.void_reason}”` : '.'}` : envelope.status === 'expired' ? 'has expired.' : envelope.status === 'declined' ? 'was declined by a recipient and is no longer active.' : 'is no longer active.';
-    return card('🚫', 'No action needed', `"${envelope.title}" ${what}`);
+    return card('ban', 'No action needed', `"${envelope.title}" ${what}`, '', 'warn');
   }
   if (mode === 'waiting') {
-    return card('⏳', 'It\'s not your turn yet', `"${envelope.title}" needs to be completed by other recipients first. We'll email you as soon as it's ready for you.`);
+    return card('clock', 'It\'s not your turn yet', `"${envelope.title}" needs to be completed by other recipients first. We'll email you as soon as it's ready for you.`);
   }
   if (mode === 'sign') return renderSigning(data);
   return renderReadOnly(data);
 }
 
-function card(icon, title, text, extra = '') {
-  app.innerHTML = html`<div class="sign-top"><span class="brand-mark">✍</span><span class="title">LangSync Sign</span></div>
-    <div class="card center-card"><div class="big">${icon}</div><h1>${title}</h1><p class="muted">${text}</p>${raw(extra)}</div>`;
+function card(ic, title, text, extra = '', tone = '') {
+  app.innerHTML = html`<div class="sign-top">${raw(LOCKUP)}<span class="badge">Sign</span></div>
+    <div class="center-wrap field-texture"><div class="card center-card rise"><span class="tile tile-lg ${tone ? `tile-${tone}` : 'tile-grad'}">${raw(icon(ic, 24))}</span><h1>${title}</h1><p class="muted">${text}</p>${raw(extra)}</div></div>`;
 }
 
 function renderCode(data) {
-  card('🔐', 'Enter your access code', `${data.owner.name} protected "${data.envelope.title}" with an access code. They should have shared it with you separately.`,
+  card('lock', 'Enter your access code', `${data.owner.name} protected "${data.envelope.title}" with an access code. They should have shared it with you separately.`,
     html`<form data-code style="margin-top:16px"><input type="text" name="code" autocomplete="one-time-code" placeholder="Access code" style="text-align:center;font-size:18px;max-width:240px"><div class="err"></div><button class="btn primary">Continue</button></form>`);
   const form = app.querySelector('[data-code]');
   form.querySelector('input').focus();
@@ -62,7 +65,7 @@ function renderCode(data) {
 }
 
 function header(data, right = '') {
-  return html`<div class="sign-top"><span class="brand-mark">✍</span>
+  return html`<div class="sign-top">${raw(LOCKUP)}<span class="divider"></span>
     <div><div class="title">${data.envelope.title}</div><div class="from">From ${data.owner.name} · ${data.owner.email}</div></div>
     <div class="spacer"></div>${raw(right)}</div>`;
 }
@@ -72,12 +75,12 @@ function header(data, right = '') {
 async function renderReadOnly(data) {
   const { mode, envelope, recipient } = data;
   const banner = mode === 'completed'
-    ? html`<strong>✅ Completed ${fmtDate(envelope.completed_at)}.</strong> All parties have finished. Download the signed copy with its certificate of completion.`
+    ? html`<strong>Completed ${fmtDate(envelope.completed_at)}.</strong> All parties have finished. Download the signed copy with its certificate of completion.`
     : mode === 'done'
-      ? html`<strong>✅ You're done.</strong> Thanks, ${recipient.name}. We'll email everyone the completed copy once all parties have finished.`
+      ? html`<strong>You're done.</strong> Thanks, ${recipient.name}. We'll email everyone the completed copy once all parties have finished.`
       : html`<strong>You're receiving a copy.</strong> ${data.owner.name} added you as a CC, so there's nothing to sign. You'll get the completed copy by email.`;
-  app.innerHTML = html`${raw(header(data, envelope.status === 'completed' ? html`<a class="btn primary" href="${base}/download">⬇ Download signed PDF</a>` : ''))}
-    <div class="sign-banner"><p>${raw(banner)}</p></div>
+  app.innerHTML = html`${raw(header(data, envelope.status === 'completed' ? html`<a class="btn primary" href="${base}/download">${raw(icon('download', 17))}Download signed PDF</a>` : ''))}
+    <div class="sign-banner"><span class="tile ${mode === 'view' ? '' : 'tile-good'}">${raw(icon(mode === 'view' ? 'mail' : 'checkCircle', 18))}</span><p>${raw(banner)}</p></div>
     <div class="sign-stage"><div class="docs" data-docs></div></div>`;
   const pages = await renderDocuments(app.querySelector('[data-docs]'), data.documents, (d) => `${base}/documents/${d.id}`);
   drawReadonlyFields(pages, data.fields);
@@ -110,19 +113,19 @@ async function renderSigning(data) {
   const finishLabel = isApprover ? 'Approve' : 'Finish';
 
   app.innerHTML = html`${raw(header(data, html`<span class="progress" data-progress></span>
-      <button class="btn ghost small" data-decline>Decline</button>
+      <button class="btn ghost small" data-decline>${raw(icon('xCircle', 15))}Decline</button>
       <button class="btn primary" data-finish>${finishLabel}</button>`))}
     <div class="sign-banner" data-banner></div>
     <div class="sign-stage"><div class="docs" data-docs><div class="empty">Loading documents…</div></div></div>
     <button class="next-btn" data-next hidden>Start</button>
-    ${raw(envelope.allow_markup ? '<div class="sign-tools" data-tools><button class="btn ghost small" data-toggle-markup>✎ Mark up / comment</button><div data-bar hidden></div></div>' : '')}`;
+    ${raw(envelope.allow_markup ? `<div class="sign-tools" data-tools><button class="btn ghost small" data-toggle-markup>${icon('pen', 15)}<span>Mark up / comment</span></button><div data-bar hidden></div></div>` : '')}`;
   const $ = (s) => app.querySelector(s);
 
   const renderBanner = () => {
     const msg = envelope.message ? html`<div class="small" style="margin-bottom:6px"><strong>${data.owner.name}:</strong> <span style="white-space:pre-wrap">${envelope.message}</span></div>` : '';
     if (!consented) {
-      $('[data-banner]').innerHTML = html`<p>${raw(msg)}Please read the <a href="#" data-disclosure>Electronic Record and Signature Disclosure</a>.<br>
-        <label class="check" style="margin:8px 0 0"><input type="checkbox" data-agree><span>I agree to use electronic records and signatures.</span></label></p>
+      $('[data-banner]').innerHTML = html`<div class="txt">${raw(msg)}Please read the <a href="#" data-disclosure>Electronic Record and Signature Disclosure</a>.<br>
+        <label class="check" style="margin:8px 0 0"><input type="checkbox" data-agree><span>I agree to use electronic records and signatures.</span></label></div>
         <button class="btn primary" data-continue disabled>Continue</button>`;
       $('[data-agree]').onchange = (e) => ($('[data-continue]').disabled = !e.target.checked);
       $('[data-disclosure]').onclick = (e) => { e.preventDefault(); modal({ title: 'Electronic Record and Signature Disclosure', render: (b) => { b.innerHTML = html`<p class="note-text">${DISCLOSURE}</p>`; } }); };
@@ -134,9 +137,9 @@ async function renderSigning(data) {
         nextField();
       };
     } else {
-      $('[data-banner]').innerHTML = html`<p>${raw(msg)}${isApprover && !myFields.length
+      $('[data-banner]').innerHTML = html`<div class="txt">${raw(msg)}${isApprover && !myFields.length
         ? 'Review the documents, then click Approve.'
-        : html`You're signing as <strong>${recipient.name}</strong> (${ROLE_LABEL[recipient.role].toLowerCase()}). Click each highlighted field, then click ${finishLabel}.`}</p>`;
+        : html`You're signing as <strong>${recipient.name}</strong> (${ROLE_LABEL[recipient.role].toLowerCase()}). Click each highlighted field, then click ${finishLabel}.`}</div>`;
     }
     document.body.classList.toggle('locked', !consented);
   };
@@ -173,7 +176,7 @@ async function renderSigning(data) {
       const img = f.type === 'signature' ? signature : initials;
       node.innerHTML = filled && img
         ? html`<button class="sigbtn" title="Click to remove"><div class="sig-wrap">${raw(f.type === 'signature' ? '<span class="tag">LangSync Sign</span>' : '')}<img src="${img}" alt="Your ${f.type}"></div></button>`
-        : html`<button class="sigbtn"><span>${f.type === 'signature' ? 'Sign' : 'Initial'}</span><span style="font-size:1.4em">${f.type === 'signature' ? '✍' : '⤓'}</span></button>`;
+        : html`<button class="sigbtn">${raw(icon('pen', 14))}<span>${f.type === 'signature' ? 'Sign' : 'Initial'}</span></button>`;
       node.querySelector('button').onclick = async () => {
         if (!consented) return toast('Please agree to use electronic signatures first.');
         if (filled) { values[f.id] = ''; paintField(f); return update(); }
@@ -216,7 +219,9 @@ async function renderSigning(data) {
   function update() {
     const req = myFields.filter(required);
     const left = remaining().length;
-    $('[data-progress]').textContent = req.length ? `${req.length - left} of ${req.length} required fields` : '';
+    $('[data-progress]').innerHTML = req.length
+      ? html`<span class="progress-bar"><span style="width:${Math.round(((req.length - left) / req.length) * 100)}%"></span></span>${req.length - left} of ${req.length} required`
+      : '';
     const next = $('[data-next]');
     next.hidden = !consented || !left;
     next.textContent = req.length - left === 0 ? 'Start' : 'Next';
@@ -250,7 +255,7 @@ async function renderSigning(data) {
       if (!consented) return toast('Please agree to use electronic signatures first.');
       const open = $('[data-bar]').hidden;
       $('[data-bar]').hidden = !open;
-      $('[data-toggle-markup]').textContent = open ? 'Done marking up' : '✎ Mark up / comment';
+      $('[data-toggle-markup] span').textContent = open ? 'Done marking up' : 'Mark up / comment';
       if (!open) bar.reset();
     };
   } else {
@@ -276,11 +281,11 @@ async function renderSigning(data) {
     try {
       const res = await api('POST', `${base}/complete`, { values, signature, initials, annotations: marks });
       document.body.classList.remove('markup-active');
-      card('🎉', isApprover ? 'Approved!' : 'You\'re done signing!',
+      card('checkCircle', isApprover ? 'Approved' : 'You\'re done signing',
         res.status === 'completed'
           ? 'Everyone has finished. A copy of the completed document is on its way to your inbox.'
           : `Thanks, ${recipient.name}. ${data.owner.name} has been notified. We'll email you the completed copy once everyone has finished.`,
-        res.status === 'completed' ? html`<a class="btn primary" href="${base}/download">⬇ Download signed PDF</a>` : '');
+        res.status === 'completed' ? html`<a class="btn primary" href="${base}/download">${raw(icon('download', 17))}Download signed PDF</a>` : '', 'good');
     } catch (err) {
       e.target.disabled = false;
       toast(err.message, { type: 'error' });
@@ -295,7 +300,7 @@ async function renderSigning(data) {
     });
     if (!reason) return;
     await api('POST', `${base}/decline`, { reason });
-    card('👋', 'You declined to sign', `${data.owner.name} has been notified.`);
+    card('xCircle', 'You declined to sign', `${data.owner.name} has been notified.`, '', 'bad');
   };
 
   renderBanner();

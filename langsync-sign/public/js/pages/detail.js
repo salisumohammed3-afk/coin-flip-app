@@ -1,6 +1,7 @@
 // Envelope tracking page: live recipient status, history, preview and actions.
 import { api, html, raw, el, toast, fmtDate, timeAgo, STATUS, RECIPIENT_STATUS, ROLE_LABEL, pill, confirmDialog, modal } from '../ui.js';
-import { go, state, eventIcon } from '../app.js';
+import { go, state } from '../app.js';
+import { icon, eventTile } from '../icons.js';
 import { renderDocuments, findPage, placeBox, FIELD_TYPES } from '../viewer.js';
 import { Markup } from '../markup.js';
 
@@ -11,12 +12,12 @@ export async function renderDetail(view, id) {
   view.innerHTML = html`<div data-head></div>
     <div class="detail-grid">
       <div style="display:grid;gap:18px;min-width:0">
-        <div class="card"><div class="card-head"><h2>Recipients</h2><span class="muted small" data-progress></span></div><ul class="timeline" data-recipients></ul></div>
-        <div class="card"><div class="card-head"><h2>Documents</h2><span class="muted small">${env.documents.length} file${env.documents.length === 1 ? '' : 's'}</span></div><div class="preview-docs"><div class="docs" data-docs></div></div></div>
+        <div class="card"><div class="card-head"><div class="left"><span class="tile">${raw(icon('users', 18))}</span><h2>Recipients</h2></div><span class="muted small" data-progress></span></div><ul class="timeline" data-recipients></ul></div>
+        <div class="card"><div class="card-head"><div class="left"><span class="tile">${raw(icon('file', 18))}</span><h2>Documents</h2></div><span class="muted small">${env.documents.length} file${env.documents.length === 1 ? '' : 's'}</span></div><div class="preview-docs"><div class="docs" data-docs></div></div></div>
       </div>
       <div style="display:grid;gap:18px">
         <div class="card card-pad" data-details></div>
-        <div class="card"><div class="card-head"><h2>History</h2><span class="muted small">Audit trail</span></div><table class="history" data-history></table></div>
+        <div class="card"><div class="card-head"><div class="left"><span class="tile">${raw(icon('clock', 18))}</span><h2>History</h2></div><span class="muted small">Audit trail</span></div><table class="history" data-history></table></div>
       </div>
     </div>`;
   const $ = (s) => view.querySelector(s);
@@ -25,29 +26,29 @@ export async function renderDetail(view, id) {
     const actionable = env.recipients.filter((r) => r.role !== 'cc');
     const done = actionable.filter((r) => r.status === 'completed').length;
     $('[data-head]').innerHTML = html`<div class="page-head">
-      <div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h1>${env.title}</h1>${pill(STATUS, env.status)}</div>
+      <div><p class="eyebrow">Envelope</p><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><h1>${env.title}</h1>${pill(STATUS, env.status)}</div>
         <p class="muted">From ${env.owner.name} · Sent ${fmtDate(env.sent_at)}${env.completed_at ? ` · Completed ${fmtDate(env.completed_at)}` : ''}</p></div>
       <div class="actions-row">
-        ${raw(env.has_final ? html`<a class="btn ghost" href="/api/envelopes/${env.id}/download?inline=1" target="_blank" rel="noopener">View completed PDF</a><a class="btn primary" href="/api/envelopes/${env.id}/download">⬇ Download</a>` : '')}
-        ${raw(env.status === 'sent' ? '<button class="btn primary" data-remind>🔔 Remind</button><button class="btn ghost" data-void>Void</button>' : '')}
-        <button class="btn ghost" data-dup>Duplicate</button>
-        <button class="btn ghost" data-tpl>Save as template</button>
-        ${raw(env.status !== 'sent' ? '<button class="btn ghost" data-del style="color:var(--red)">Delete</button>' : '')}
+        ${raw(env.has_final ? html`<a class="btn ghost" href="/api/envelopes/${env.id}/download?inline=1" target="_blank" rel="noopener">${raw(icon('eye', 17))}View completed PDF</a><a class="btn primary" href="/api/envelopes/${env.id}/download">${raw(icon('download', 17))}Download</a>` : '')}
+        ${raw(env.status === 'sent' ? `<button class="btn primary" data-remind>${icon('bell', 17)}Remind</button><button class="btn ghost" data-void>${icon('ban', 17)}Void</button>` : '')}
+        <button class="btn ghost" data-dup>${raw(icon('copy', 17))}Duplicate</button>
+        <button class="btn ghost" data-tpl>${raw(icon('template', 17))}Save as template</button>
+        ${raw(env.status !== 'sent' ? `<button class="btn ghost danger-text" data-del>${icon('trash', 17)}Delete</button>` : '')}
       </div></div>
-      ${raw(env.status === 'declined' ? html`<div class="callout bad" style="margin-bottom:16px"><strong>Declined</strong> by ${env.recipients.find((r) => r.status === 'declined')?.name}: “${env.recipients.find((r) => r.status === 'declined')?.decline_reason}”. Duplicate the envelope to fix and resend.</div>` : '')}
-      ${raw(env.status === 'voided' ? html`<div class="callout bad" style="margin-bottom:16px"><strong>Voided:</strong> ${env.void_reason}</div>` : '')}
-      ${raw(env.status === 'expired' ? '<div class="callout warn" style="margin-bottom:16px"><strong>Expired</strong> before everyone signed. Duplicate it to send again.</div>' : '')}`;
+      ${raw(env.status === 'declined' ? html`<div class="callout bad" style="margin-bottom:16px">${raw(icon('xCircle', 18))}<div><strong>Declined</strong> by ${env.recipients.find((r) => r.status === 'declined')?.name}: “${env.recipients.find((r) => r.status === 'declined')?.decline_reason}”. Duplicate the envelope to fix and resend.</div></div>` : '')}
+      ${raw(env.status === 'voided' ? html`<div class="callout bad" style="margin-bottom:16px">${raw(icon('ban', 18))}<div><strong>Voided:</strong> ${env.void_reason}</div></div>` : '')}
+      ${raw(env.status === 'expired' ? `<div class="callout warn" style="margin-bottom:16px">${icon('clock', 18)}<div><strong>Expired</strong> before everyone signed. Duplicate it to send again.</div></div>` : '')}`;
     $('[data-progress]').textContent = `${done} of ${actionable.length} complete`;
 
     $('[data-recipients]').innerHTML = [...env.recipients].sort((a, b) => a.routing_order - b.routing_order).map((r) => html`<li style="--c:${r.color}">
       <span class="ord">${env.sequential ? r.routing_order : r.role === 'cc' ? 'cc' : '•'}</span>
       <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t-title">${r.name}</span>${pill(RECIPIENT_STATUS, r.status)}</div>
-        <div class="t-sub">${r.email} · ${ROLE_LABEL[r.role]}${r.access_code ? ' · 🔐 access code' : ''}</div>
+        <div class="t-sub">${r.email} · ${ROLE_LABEL[r.role]}${r.access_code ? ' · access code' : ''}</div>
         <div class="t-sub">${[r.sent_at && `Sent ${timeAgo(r.sent_at)}`, r.viewed_at && `Viewed ${timeAgo(r.viewed_at)}`, r.completed_at && `${r.role === 'approver' ? 'Approved' : r.role === 'cc' ? 'Delivered' : 'Signed'} ${fmtDate(r.completed_at)}`, r.declined_at && `Declined ${fmtDate(r.declined_at)}`].filter(Boolean).join(' · ') || (env.status === 'sent' ? 'Waiting for earlier recipients' : '')}</div>
         ${raw(r.signature_image ? html`<img src="${r.signature_image}" alt="Signature of ${r.name}" style="max-height:38px;max-width:180px;margin-top:6px">` : '')}
       </div>
       <div class="acts">
-        ${raw(r.link && !['completed', 'declined'].includes(r.status) ? html`<button class="btn ghost small" data-copy="${r.link}" title="Copy this recipient's private signing link">Copy link</button>` : '')}
+        ${raw(r.link && !['completed', 'declined'].includes(r.status) ? html`<button class="btn ghost small" data-copy="${r.link}" title="Copy this recipient's private signing link">${raw(icon('copy', 15))}Copy link</button>` : '')}
         ${raw(env.status === 'sent' && !['completed', 'declined'].includes(r.status) ? html`<button class="btn ghost small" data-correct="${r.id}">Correct</button>` : '')}
       </div></li>`).join('');
 
@@ -63,7 +64,7 @@ export async function renderDetail(view, id) {
       </dl>`;
 
     $('[data-history]').innerHTML = [...env.events].reverse().map((e) => html`<tr><td>${fmtDate(e.created_at)}</td>
-      <td>${eventIcon(e.type)} <strong>${e.actor.replace(/ <.*>/, '')}</strong> · ${e.detail || e.type}${raw(e.ip ? html`<div class="muted small">IP ${e.ip}</div>` : '')}</td></tr>`).join('');
+      <td><div class="ev">${raw(eventTile(e.type))}<div><strong>${e.actor.replace(/ <.*>/, '')}</strong> · ${e.detail || e.type}${raw(e.ip ? html`<div class="muted small">IP ${e.ip}</div>` : '')}</div></div></td></tr>`).join('');
 
     bindActions();
   }

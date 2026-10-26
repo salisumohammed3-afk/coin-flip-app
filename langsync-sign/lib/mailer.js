@@ -10,18 +10,21 @@ const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function layout({ heading, intro, message, buttonLabel, link, footer }) {
-  return `<!doctype html><html><body style="margin:0;background:#F6F2FF;font-family:'HK Grotesk Pro','HK Grotesk',Helvetica,Arial,sans-serif;color:#111">
+  // Mirrors the LangSync design system: Outfit/DM Sans, ink #0B1220, brand #0099FF, gradient accent.
+  return `<!doctype html><html><body style="margin:0;background:#F6F8FB;font-family:'DM Sans',Helvetica,Arial,sans-serif;color:#0B1220">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #E8E8E8">
-<tr><td style="background:linear-gradient(90deg,#49229D,#8B36FE);background-color:#49229D;padding:20px 28px;color:#fff;font-weight:700;font-size:18px">${esc(config.appName)}</td></tr>
-<tr><td style="padding:28px">
-<h1 style="margin:0 0 12px;font-size:22px;color:#49229D">${esc(heading)}</h1>
-<p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#3B3B3B">${esc(intro)}</p>
-${message ? `<div style="margin:0 0 20px;padding:14px 16px;background:#F6F2FF;border-radius:10px;font-size:14px;line-height:1.5;white-space:pre-wrap">${esc(message)}</div>` : ''}
-${link ? `<a href="${esc(link)}" style="display:inline-block;background:#49229D;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700">${esc(buttonLabel)}</a>` : ''}
-${footer ? `<p style="margin:24px 0 0;font-size:12px;color:#8A8A8A;line-height:1.5">${esc(footer)}</p>` : ''}
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #E9EDF3">
+<tr><td style="height:4px;background:linear-gradient(135deg,#128EFE,#9135FC);background-color:#0099FF;font-size:0;line-height:0">&nbsp;</td></tr>
+<tr><td style="padding:22px 28px 0"><img src="${esc(config.baseUrl)}/img/lockup.png" alt="LangSync" height="26" style="height:26px;width:auto;display:block;border:0"></td></tr>
+<tr><td style="padding:22px 28px 28px">
+<p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#0B64A8">${esc(config.appName)}</p>
+<h1 style="margin:0 0 12px;font-family:'Outfit','DM Sans',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.2;letter-spacing:-0.02em;color:#0B1220">${esc(heading)}</h1>
+<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#5B6472">${esc(intro)}</p>
+${message ? `<div style="margin:0 0 22px;padding:14px 16px;background:#F6F9FE;border:1px solid #E9EDF3;border-radius:12px;font-size:14px;line-height:1.55;white-space:pre-wrap;color:#0B1220">${esc(message)}</div>` : ''}
+${link ? `<a href="${esc(link)}" style="display:inline-block;background:#0099FF;color:#fff;text-decoration:none;padding:13px 24px;border-radius:12px;font-weight:600;font-size:15px">${esc(buttonLabel)}</a>` : ''}
+${footer ? `<p style="margin:24px 0 0;font-size:12px;color:#5B6472;line-height:1.5">${esc(footer)}</p>` : ''}
 </td></tr></table>
-<p style="font-size:11px;color:#8A8A8A;margin-top:16px">Do not forward this email: the link is unique to you.</p>
+<p style="font-size:11px;color:#5B6472;margin-top:16px">Do not forward this email: the link is unique to you.</p>
 </td></tr></table></body></html>`;
 }
 

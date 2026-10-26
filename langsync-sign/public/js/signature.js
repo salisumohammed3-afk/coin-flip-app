@@ -113,14 +113,14 @@ function drawingPad(canvas) {
     last = pos(e);
     ctx.beginPath();
     ctx.arc(last[0], last[1], 2.2, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1446';
+    ctx.fillStyle = '#0B1F4D';
     ctx.fill();
     pad.empty = false;
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!last) return;
     const p = pos(e);
-    ctx.strokeStyle = '#1a1446';
+    ctx.strokeStyle = '#0B1F4D';
     ctx.lineWidth = 4.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -145,7 +145,7 @@ async function typed(text, font, size) {
   c.width = Math.min(w, 2000);
   c.height = Math.round(size * 1.8);
   ctx.font = `${size}px "${font}"`;
-  ctx.fillStyle = '#1a1446';
+  ctx.fillStyle = '#0B1F4D';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, size / 2, c.height / 2);
   return trim(c);

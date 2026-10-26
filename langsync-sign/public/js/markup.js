@@ -1,19 +1,20 @@
 // Document markup: pen, highlighter, box, line, text and sticky-note comments.
 import { el, html, esc, modal, prompt, fmtDate } from './ui.js';
+import { icon } from './icons.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const W = 1000;
 
 export const MARKUP_TOOLS = [
-  { id: 'pen', label: 'Pen', icon: '✎', color: '#E5484D' },
-  { id: 'highlight', label: 'Highlight', icon: '▮', color: '#FFE14D' },
-  { id: 'rect', label: 'Box', icon: '▢', color: '#49229D' },
-  { id: 'line', label: 'Line / strike', icon: '╱', color: '#E5484D' },
-  { id: 'text', label: 'Text', icon: 'T', color: '#49229D' },
-  { id: 'note', label: 'Comment', icon: '💬', color: '#FFD84D' },
-  { id: 'eraser', label: 'Erase', icon: '⌫' },
+  { id: 'pen', label: 'Pen', icon: 'pen', color: '#E5484D' },
+  { id: 'highlight', label: 'Highlight', icon: 'highlighter', color: '#FFE14D' },
+  { id: 'rect', label: 'Box', icon: 'square', color: '#0B64A8' },
+  { id: 'line', label: 'Strike', icon: 'slash', color: '#E5484D' },
+  { id: 'text', label: 'Text', icon: 'type', color: '#0B64A8' },
+  { id: 'note', label: 'Comment', icon: 'message', color: '#FFD84D' },
+  { id: 'eraser', label: 'Erase', icon: 'eraser' },
 ];
-export const MARKUP_COLORS = ['#E5484D', '#49229D', '#0EA5E9', '#10B981', '#111111', '#FFE14D'];
+export const MARKUP_COLORS = ['#E5484D', '#0099FF', '#9135FC', '#0F7A44', '#0B1220', '#FFE14D'];
 
 let localId = 0;
 
@@ -262,11 +263,11 @@ function simplify(points) {
 /** Toolbar with markup tools, colours and undo. */
 export function markupToolbar(markup, { onToolChange } = {}) {
   const bar = el(html`<div class="markup-bar" role="toolbar" aria-label="Markup tools">
-    ${MARKUP_TOOLS.map((t) => html`<button class="tool" data-tool="${t.id}" title="${t.label}" aria-pressed="false"><span>${t.icon}</span><small>${t.label}</small></button>`).map((s) => ({ __raw: s }))}
+    ${MARKUP_TOOLS.map((t) => html`<button class="tool" data-tool="${t.id}" title="${t.label}" aria-pressed="false">${{ __raw: icon(t.icon, 18) }}<small>${t.label}</small></button>`).map((s) => ({ __raw: s }))}
     <span class="bar-sep"></span>
     ${MARKUP_COLORS.map((c) => html`<button class="swatch" data-color="${c}" style="--c:${c}" title="Colour ${c}" aria-label="Colour ${c}"></button>`).map((s) => ({ __raw: s }))}
     <span class="bar-sep"></span>
-    <button class="tool" data-undo title="Undo"><span>↶</span><small>Undo</small></button>
+    <button class="tool" data-undo title="Undo">${{ __raw: icon('undo', 18) }}<small>Undo</small></button>
   </div>`);
   bar.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tool]');

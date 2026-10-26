@@ -69,13 +69,13 @@ export function placeBox(node, f) {
 }
 
 export const FIELD_TYPES = {
-  signature: { label: 'Signature', icon: '✍', w: 170, h: 46 },
+  signature: { label: 'Signature', svg: 'pen', w: 170, h: 46 },
   initials: { label: 'Initials', icon: 'AB', w: 64, h: 40 },
-  date_signed: { label: 'Date signed', icon: '📅', w: 120, h: 24 },
-  full_name: { label: 'Full name', icon: '👤', w: 170, h: 24 },
-  email: { label: 'Email', icon: '@', w: 190, h: 24 },
-  company: { label: 'Company', icon: '🏢', w: 170, h: 24 },
-  title: { label: 'Title', icon: '💼', w: 150, h: 24 },
-  text: { label: 'Text', icon: 'T', w: 170, h: 24 },
-  checkbox: { label: 'Checkbox', icon: '☑', w: 20, h: 20 },
+  date_signed: { label: 'Date signed', svg: 'calendar', w: 120, h: 24 },
+  full_name: { label: 'Full name', svg: 'user', w: 170, h: 24 },
+  email: { label: 'Email', svg: 'at', w: 190, h: 24 },
+  company: { label: 'Company', svg: 'building', w: 170, h: 24 },
+  title: { label: 'Title', svg: 'briefcase', w: 150, h: 24 },
+  text: { label: 'Text', svg: 'type', w: 170, h: 24 },
+  checkbox: { label: 'Checkbox', svg: 'squareCheck', w: 20, h: 20 },
 };

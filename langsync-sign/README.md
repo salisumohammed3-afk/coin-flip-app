@@ -81,6 +81,17 @@ Put it behind HTTPS (Caddy, nginx, or your platform's TLS). Signing links are se
 
 Serverless platforms without a persistent disk (e.g. plain Vercel functions) won't work as-is, because the app keeps its SQLite database and files on local disk.
 
+## Design
+
+The UI follows the LangSync product design system used by [hub.langsync.ai](https://hub.langsync.ai) and [onboarding.langsync.ai](https://onboarding.langsync.ai):
+- the `--ls-*` tokens: brand `#0099FF` / ink `#0B64A8`, the `#128EFE → #9135FC` gradient, text `#0B1220`
+- Outfit for headings and DM Sans for body text
+- the official lockup
+- the split sign-in screen with a dotted "field texture" panel
+- a white sidebar shell and Lucide icons
+
+Emails and the certificate of completion use the same palette. All tokens live at the top of `public/css/app.css`.
+
 ## How it works
 
 ```
@@ -96,6 +107,7 @@ public/js/           vanilla-JS front end (no build step)
   sign.js            recipient signing experience
   viewer.js          PDF.js rendering with overlay layer
   markup.js          annotation tools
+  icons.js           Lucide icon set
   signature.js       adopt-signature dialog
 ```
 

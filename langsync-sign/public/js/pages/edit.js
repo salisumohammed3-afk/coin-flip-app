@@ -1,6 +1,7 @@
 // Step 1: documents, recipients (signers / approvers / CCs), message and settings.
 import { api, html, raw, toast, fmtSize, debounce, RECIPIENT_COLORS, confirmDialog } from '../ui.js';
 import { go, state } from '../app.js';
+import { icon } from '../icons.js';
 
 export function stepsBar(env, current) {
   const steps = [['edit', 'Documents & recipients'], ['prepare', 'Fields & markup'], ['review', env.is_template ? 'Save template' : 'Review & send']];
@@ -16,15 +17,15 @@ export async function renderEditStep(view, id) {
 
   view.innerHTML = html`
     <div class="page-head">
-      <div><div class="muted small">${env.is_template ? 'Template' : 'Draft envelope'}</div>
-        <input type="text" data-title value="${env.title}" aria-label="Envelope title" style="font-size:24px;font-weight:800;border:0;padding:2px 0;background:transparent;color:var(--ink);box-shadow:none;min-width:320px"></div>
+      <div><p class="eyebrow">${env.is_template ? 'Template' : 'Draft envelope'}</p>
+        <input type="text" data-title value="${env.title}" aria-label="Envelope title" style="font-family:var(--ls-font-display);font-size:30px;font-weight:700;letter-spacing:-.03em;border:0;padding:0;border-radius:0;background:transparent;color:var(--ls-ink);box-shadow:none;min-width:320px"></div>
       ${raw(stepsBar(env, 'edit'))}
     </div>
 
     <div class="card card-pad" style="margin-bottom:18px">
-      <h2 style="margin-bottom:12px">1. Add documents</h2>
+      <div class="section-title"><span class="tile">${raw(icon('file', 18))}</span><div><h2>Documents</h2><p class="muted small">Everything in this package</p></div></div>
       <label class="dropzone" data-drop>
-        <div class="big">📄</div><div><strong>Drop files here</strong> or click to upload</div>
+        <span class="tile tile-lg">${raw(icon('upload', 24))}</span><div><strong>Drop files here</strong> or click to upload</div>
         <div class="muted small">PDF, PNG or JPG · up to 10 files at a time · documents are combined into one package</div>
         <input type="file" multiple accept="application/pdf,image/png,image/jpeg" hidden data-file>
       </label>
@@ -32,20 +33,20 @@ export async function renderEditStep(view, id) {
     </div>
 
     <div class="card card-pad" style="margin-bottom:18px">
-      <div class="recipient-head"><h2>2. Add recipients</h2>
+      <div class="recipient-head"><div class="section-title" style="margin:0"><span class="tile">${raw(icon('users', 18))}</span><div><h2>Recipients</h2><p class="muted small">Signers, approvers and people who get a copy</p></div></div>
         <label class="check" style="margin:0"><input type="checkbox" data-seq ${env.sequential ? 'checked' : ''}><span><strong>Set signing order</strong> <span class="muted small">— recipients act one after another</span></span></label></div>
       <div data-recipients></div>
-      <div class="actions-row"><button class="btn ghost small" data-add>＋ Add recipient</button><button class="btn ghost small" data-add-me>＋ Add me</button></div>
+      <div class="actions-row"><button class="btn ghost small" data-add>${raw(icon('plus', 15))}Add recipient</button><button class="btn ghost small" data-add-me>${raw(icon('user', 15))}Add me</button></div>
     </div>
 
     <div class="card card-pad" style="margin-bottom:18px">
-      <h2 style="margin-bottom:12px">3. Message</h2>
+      <div class="section-title"><span class="tile">${raw(icon('mail', 18))}</span><div><h2>Message</h2><p class="muted small">What recipients see in their email</p></div></div>
       <label class="field"><span>Email subject <span class="hint">(defaults to "Please sign: <em>envelope title</em>")</span></span><input type="text" data-subject maxlength="200" value="${env.subject}"></label>
       <label class="field"><span>Message to all recipients</span><textarea rows="4" data-message maxlength="5000" placeholder="Hi, please review and sign. Thanks!">${env.message}</textarea></label>
     </div>
 
     <div class="card card-pad">
-      <h2 style="margin-bottom:12px">4. Settings</h2>
+      <div class="section-title"><span class="tile">${raw(icon('shield', 18))}</span><div><h2>Settings</h2><p class="muted small">Markup, expiry and reminders</p></div></div>
       <label class="check"><input type="checkbox" data-markup ${env.allow_markup ? 'checked' : ''}><span><strong>Let recipients mark up documents</strong><br><span class="muted small">Recipients can draw, highlight, add text and leave comments. Their markup is flattened into the completed PDF.</span></span></label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:520px">
         <label class="field"><span>Expires after (days)</span><input type="number" min="0" max="365" data-expires value="${env.expires_days}"><span class="hint small muted">0 = never</span></label>
@@ -57,7 +58,7 @@ export async function renderEditStep(view, id) {
       <span class="save-state" data-saved style="margin-right:auto"></span>
       <button class="btn ghost" data-delete>Discard</button>
       <button class="btn ghost" data-close>Save &amp; close</button>
-      <button class="btn primary" data-next>Next: place fields →</button>
+      <button class="btn primary" data-next>Next: place fields${raw(icon('arrowRight', 17))}</button>
     </div>`;
 
   const $ = (s) => view.querySelector(s);
@@ -68,7 +69,7 @@ export async function renderEditStep(view, id) {
     $('[data-docs]').innerHTML = env.documents.map((d) => html`<li><span class="doc-icon">PDF</span><div class="grow"><div class="t-title">${d.name}</div>
       <div class="t-sub">${d.page_count} page${d.page_count === 1 ? '' : 's'} · ${fmtSize(d.size)}</div></div>
       <a class="btn ghost small" target="_blank" rel="noopener" href="/api/envelopes/${env.id}/documents/${d.id}/file">Preview</a>
-      <button class="icon-btn" data-rm="${d.id}" title="Remove">🗑</button></li>`).join('');
+      <button class="icon-btn" data-rm="${d.id}" title="Remove" aria-label="Remove ${d.name}">${raw(icon('trash', 17))}</button></li>`).join('');
     view.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => {
       const ok = await confirmDialog({ title: 'Remove document?', message: 'Any fields or markup placed on it will be removed too.', confirmLabel: 'Remove', danger: true });
       if (!ok) return;
@@ -116,7 +117,7 @@ export async function renderEditStep(view, id) {
     const box = $('[data-recipients]');
     box.classList.toggle('no-order', !seq);
     box.innerHTML = recipients.length ? recipients.map((r, i) => html`<div class="recipient" style="--c:${r.color}" data-i="${i}">
-        <div class="handle order-col" title="Signing order">⋮⋮</div>
+        <div class="handle order-col" title="Signing order">${raw(icon('users', 17))}</div>
         <input class="order order-col" type="number" min="1" max="99" value="${r.routing_order}" data-k="routing_order" title="Signing order" aria-label="Signing order">
         <input type="text" placeholder="Name" value="${r.name}" data-k="name" aria-label="Recipient name">
         <input type="email" placeholder="Email" value="${r.email}" data-k="email" aria-label="Recipient email">
@@ -125,7 +126,7 @@ export async function renderEditStep(view, id) {
           <option value="approver" ${r.role === 'approver' ? 'selected' : ''}>Needs to approve</option>
           <option value="cc" ${r.role === 'cc' ? 'selected' : ''}>Receives a copy (CC)</option>
         </select>
-        <button class="icon-btn" data-remove title="Remove recipient">✕</button>
+        <button class="icon-btn" data-remove title="Remove recipient" aria-label="Remove recipient">${raw(icon('x', 17))}</button>
         <details class="more" ${r.access_code || r.private_message ? 'open' : ''}><summary class="muted small" style="cursor:pointer">More options: access code, private message</summary>
           <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:8px">
             <label class="field"><span>Access code <span class="hint">(share separately)</span></span><input type="text" value="${r.access_code}" data-k="access_code" maxlength="64" placeholder="Optional"></label>

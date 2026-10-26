@@ -2,6 +2,7 @@
 import { api, html, raw, toast, ROLE_LABEL } from '../ui.js';
 import { go } from '../app.js';
 import { stepsBar } from './edit.js';
+import { icon } from '../icons.js';
 
 export async function renderReview(view, id) {
   const env = await api('GET', `/api/envelopes/${id}`);
@@ -18,8 +19,8 @@ export async function renderReview(view, id) {
   const ordered = [...env.recipients].sort((a, b) => a.routing_order - b.routing_order);
 
   view.innerHTML = html`
-    <div class="page-head"><div><div class="muted small">${env.is_template ? 'Template' : 'Ready to send'}</div><h1>${env.title}</h1></div>${raw(stepsBar(env, 'review'))}</div>
-    ${raw(problems.length ? html`<div class="callout bad" style="margin-bottom:16px"><strong>Fix these before ${env.is_template ? 'saving' : 'sending'}:</strong><ul style="margin:6px 0 0">${raw(problems.map((p) => html`<li>${p}</li>`).join(''))}</ul></div>` : '')}
+    <div class="page-head"><div><p class="eyebrow">${env.is_template ? 'Template' : 'Ready to send'}</p><h1>${env.title}</h1></div>${raw(stepsBar(env, 'review'))}</div>
+    ${raw(problems.length ? html`<div class="callout bad" style="margin-bottom:16px">${raw(icon('alert', 18))}<div><strong>Fix these before ${env.is_template ? 'saving' : 'sending'}:</strong><ul style="margin:6px 0 0">${raw(problems.map((p) => html`<li>${p}</li>`).join(''))}</ul></div></div>` : '')}
     <div class="detail-grid">
       <div class="card">
         <div class="card-head"><h2>Recipients</h2><span class="muted small">${env.sequential ? 'Signing in order' : 'Everyone at once'}</span></div>
@@ -27,7 +28,7 @@ export async function renderReview(view, id) {
           const n = env.fields.filter((f) => f.recipient_id === r.id).length;
           return html`<li style="--c:${r.color}"><span class="ord">${env.sequential ? r.routing_order : '•'}</span>
             <div><div class="t-title">${r.name}</div><div class="t-sub">${r.email || 'Email added when the template is used'}</div>
-            <div class="t-sub">${ROLE_LABEL[r.role]}${r.role === 'cc' ? '' : ` · ${n} field${n === 1 ? '' : 's'}`}${r.access_code ? ' · 🔐 access code' : ''}</div></div><span></span></li>`;
+            <div class="t-sub">${ROLE_LABEL[r.role]}${r.role === 'cc' ? '' : ` · ${n} field${n === 1 ? '' : 's'}`}${r.access_code ? ' · access code' : ''}</div></div><span></span></li>`;
         }).join(''))}</ul>
       </div>
       <div style="display:grid;gap:18px">
@@ -42,10 +43,10 @@ export async function renderReview(view, id) {
       </div>
     </div>
     <div class="wizard-foot">
-      <button class="btn ghost" data-back>← Back</button>
+      <button class="btn ghost" data-back>${raw(icon('arrowLeft', 17))}Back</button>
       ${raw(env.is_template
         ? '<button class="btn ghost" data-save>Save template</button><button class="btn primary" data-use>Use template now →</button>'
-        : '<button class="btn primary" data-send>Send envelope ✈</button>')}
+        : `<button class="btn primary" data-send>${icon('send', 17)}Send envelope</button>`)}
     </div>`;
 
   const $ = (s) => view.querySelector(s);
@@ -67,7 +68,7 @@ export async function renderReview(view, id) {
     } catch (err) {
       toast(err.message, { type: 'error' });
       e.target.disabled = false;
-      e.target.textContent = 'Send envelope ✈';
+      e.target.textContent = 'Send envelope';
     }
   });
 }
