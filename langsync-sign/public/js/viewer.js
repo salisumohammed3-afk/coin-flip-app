@@ -30,7 +30,7 @@ export async function renderDocuments(container, documents, urlFor) {
     for (let i = 0; i < pdf.numPages; i++) {
       const page = await pdf.getPage(i + 1);
       const vp = page.getViewport({ scale: 1 });
-      const pageEl = el(html`<div class="page" data-doc="${doc.id}" data-page="${i}"><canvas></canvas><div class="page-overlay"></div><div class="page-num">${doc.name} · page ${i + 1} of ${pdf.numPages}</div></div>`);
+      const pageEl = el(html`<div class="page" data-doc="${doc.id}" data-page="${i}"><canvas></canvas><div class="page-overlay"></div><div class="page-num">${doc.name}, page ${i + 1} of ${pdf.numPages}</div></div>`);
       pageEl.style.aspectRatio = `${vp.width} / ${vp.height}`;
       section.append(pageEl);
       let renderedWidth = 0;
@@ -46,7 +46,16 @@ export async function renderDocuments(container, documents, urlFor) {
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       };
       observer.observe(pageEl);
-      pages.push({ docId: doc.id, index: i, el: pageEl, overlay: pageEl.querySelector('.page-overlay'), aspect: vp.width / vp.height });
+      const entry = { docId: doc.id, index: i, el: pageEl, overlay: pageEl.querySelector('.page-overlay'), aspect: vp.width / vp.height, text: [] };
+      // Where the page's own words sit, as fractions, so the editor can warn when a box covers them.
+      entry.textReady = page.getTextContent().then(({ items }) => {
+        entry.text = items.filter((t) => t.str && t.str.trim() && t.width > 0).map((t) => {
+          const h = t.height || Math.hypot(t.transform[2], t.transform[3]);
+          const [x1, y1, x2, y2] = vp.convertToViewportRectangle([t.transform[4], t.transform[5], t.transform[4] + t.width, t.transform[5] + h]);
+          return { x: Math.min(x1, x2) / vp.width, y: Math.min(y1, y2) / vp.height, w: Math.abs(x2 - x1) / vp.width, h: Math.abs(y2 - y1) / vp.height };
+        });
+      }).catch(() => {});
+      pages.push(entry);
     }
   }
 
@@ -57,6 +66,15 @@ export async function renderDocuments(container, documents, urlFor) {
     t = setTimeout(() => pages.forEach((p) => p.el.getBoundingClientRect().top < window.innerHeight * 2 && p.el.__render()), 300);
   });
   return pages;
+}
+
+/** True when a field box hides a real share of any word on its page. */
+export function coversText(page, f) {
+  return (page?.text || []).some((t) => {
+    const ix = Math.min(f.x + f.w, t.x + t.w) - Math.max(f.x, t.x);
+    const iy = Math.min(f.y + f.h, t.y + t.h) - Math.max(f.y, t.y);
+    return ix > 0 && iy > 0 && (ix * iy) / (t.w * t.h) > 0.2;
+  });
 }
 
 export const findPage = (pages, docId, index) => pages.find((p) => p.docId === docId && p.index === index);

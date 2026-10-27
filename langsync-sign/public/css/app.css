@@ -250,6 +250,8 @@ body.markup-active .fld { pointer-events: none; }
 .fld.edit { cursor: move; touch-action: none; }
 .fld.sel { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--c); z-index: 4; }
 .fld .rz { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; background: var(--c); cursor: nwse-resize; border-radius: 3px 0 4px 0; }
+.fld.overlap { border-style: dashed; border-color: var(--ls-bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-bad) 18%, transparent); }
+.fld.overlap::after { content: '!'; position: absolute; top: 2px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--ls-bad); color: #fff; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center; }
 .fld .req { color: var(--ls-bad); margin-left: 2px; }
 .ghost-field { position: fixed; pointer-events: none; z-index: 100; border: 1.5px dashed var(--c); background: color-mix(in srgb, var(--c) 16%, white); border-radius: 6px; font-size: 11px; font-weight: 600; display: flex; align-items: center; padding: 0 6px; opacity: .92; }
 
@@ -473,9 +475,12 @@ body:has(.sign-rail) .sign-banner { padding-right: 108px; }
 .ready-bar p { margin: 4px 0 0; color: var(--ls-muted); }
 .ready-bar .btn { padding: 12px 26px; font-size: 15px; }
 body:has(.ready-bar:not([hidden])) .sign-tools { bottom: 110px; }
-.signed-frame { position: relative; width: 100%; height: 100%; border: 1.5px solid var(--ls-brand-ink); border-radius: 8px; padding: 9px 6px 3px; background: rgba(255, 255, 255, .6); }
-.signed-frame .sf-label { position: absolute; top: -7px; left: 8px; background: #fff; padding: 0 4px; font-size: 9px; font-weight: 700; color: var(--ls-ink); line-height: 1.3; }
-.signed-frame img { width: 100%; height: 100%; object-fit: contain; object-position: left center; }
+.signed-frame { position: relative; width: 100%; height: 100%; border-left: 1.5px solid var(--ls-brand-ink); padding: 11px 4px 3px 7px; display: flex; }
+.signed-frame::before, .signed-frame::after { content: ''; position: absolute; left: 0; width: 9px; border-top: 1.5px solid var(--ls-brand-ink); }
+.signed-frame::before { top: 0; }
+.signed-frame::after { bottom: 0; }
+.signed-frame .sf-label { position: absolute; top: 1px; left: 7px; font-size: 9px; font-weight: 700; color: var(--ls-ink); line-height: 1.2; }
+.signed-frame img { width: 100%; height: 100%; min-height: 0; object-fit: contain; object-position: left center; }
 .sfld select, .sfld input[type=date] { width: 100%; height: 100%; border: 0; background: transparent; padding: 0 4px; font-size: clamp(9px, 1.3vw, 14px); border-radius: 6px; }
 .sfld select:focus, .sfld input[type=date]:focus { box-shadow: none; background: rgba(255, 255, 255, .75); }
 .sfld.radio { border-radius: 50%; }

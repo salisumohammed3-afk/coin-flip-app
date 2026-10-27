@@ -113,7 +113,7 @@ export function prompt({ title, label, value = '', multiline = false, confirmLab
 }
 
 export const fmtDate = (iso, withTime = true) =>
-  iso ? new Date(iso).toLocaleString(undefined, withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }) : '—';
+  iso ? new Date(iso).toLocaleString(undefined, withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }) : 'Not set';
 
 export function timeAgo(iso) {
   if (!iso) return '';

@@ -1,7 +1,7 @@
 // Step 2: place signing fields for each recipient and mark up the documents.
 import { api, html, raw, el, toast, debounce, ROLE_LABEL, initials } from '../ui.js';
 import { go, state } from '../app.js';
-import { renderDocuments, findPage, placeBox, FIELD_TYPES, FIELD_GROUPS } from '../viewer.js';
+import { renderDocuments, findPage, placeBox, coversText, FIELD_TYPES, FIELD_GROUPS } from '../viewer.js';
 import { Markup, markupToolbar } from '../markup.js';
 import { stepsBar } from './edit.js';
 import { icon } from '../icons.js';
@@ -118,11 +118,18 @@ export async function renderPrepare(view, id) {
       bindField(node, f, page);
     }
     node.style.setProperty('--c', r?.color || '#8B36FE');
-    node.title = `${label(f)} · ${r?.name || ''}`;
+    node.title = `${label(f)}, ${r?.name || ''}`;
+    markOverlap(node, f, page);
     node.querySelector('.fl').innerHTML = html`${['checkbox', 'radio'].includes(f.type) ? '' : label(f)}${raw(f.required && !['checkbox', 'radio'].includes(f.type) && !NOT_REQUIRABLE.includes(f.type) ? '<span class="req">*</span>' : '')}`;
     node.dataset.type = f.type;
     node.classList.toggle('sel', selected === f);
     placeBox(node, f);
+  }
+  // Flags a box that sits on top of the document's own text, which would print over it.
+  function markOverlap(node, f, page) {
+    const over = coversText(page, f);
+    node.classList.toggle('overlap', over);
+    node.title = node.title.replace(/\. Covers text on the page.*$/, '') + (over ? '. Covers text on the page, move it into a blank space.' : '');
   }
   const drawAll = () => {
     view.querySelectorAll('.fld').forEach((n) => n.remove());
@@ -150,6 +157,7 @@ export async function renderPrepare(view, id) {
           f.y = clamp(start.f.y + dy, 0, 1 - f.h);
         }
         placeBox(node, f);
+        markOverlap(node, f, page);
       };
       const up = () => {
         node.removeEventListener('pointermove', move);
@@ -203,7 +211,7 @@ export async function renderPrepare(view, id) {
         const mine = fields.filter((f) => f.recipient_id === r.id);
         const hasSig = mine.some((f) => f.type === 'signature');
         return html`<div class="rcp-opt" style="--c:${r.color};cursor:default"><span class="sw"></span><span style="flex:1"><div>${r.name}</div>
-          <div class="muted small">${mine.length} field${mine.length === 1 ? '' : 's'}${raw(r.role === 'signer' && !hasSig ? ' · <span style="color:var(--ls-bad)">needs a signature</span>' : '')}</div></span></div>`;
+          <div class="muted small">${mine.length} field${mine.length === 1 ? '' : 's'}${raw(r.role === 'signer' && !hasSig ? ', <span style="color:var(--ls-bad)">needs a signature</span>' : '')}</div></span></div>`;
       }).join('');
       const marks = markup.mine().length;
       props.innerHTML = html`<h3>Summary</h3><div class="rcp-select">${raw(counts)}</div>
@@ -350,6 +358,8 @@ export async function renderPrepare(view, id) {
   state.cleanup.push(() => document.removeEventListener('keydown', onKey));
 
   drawAll();
+  // Re-check boxes once each page's text positions are known.
+  pages.forEach((p) => p.textReady.then(() => fields.filter((f) => f.document_id === p.docId && f.page === p.index).forEach(drawField)));
   renderProps();
 
   /* ---------------- navigation ---------------- */

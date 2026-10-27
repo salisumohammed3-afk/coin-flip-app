@@ -240,8 +240,8 @@ const statCard = (label, n, href, ic, tone) =>
 function feedItems(events) {
   if (!events.length) return html`<li class="muted">No activity yet. Send your first envelope to see it here.</li>`;
   return events.slice(0, 30).map((e) => html`<li>${raw(eventTile(e.type))}<div>
-    <div class="what"><strong>${e.actor.replace(/ <.*>/, '')}</strong> · ${e.detail || e.type}</div>
-    <div class="meta"><a href="#/envelopes/${e.envelope_id}">${e.title}</a> · ${timeAgo(e.created_at)}</div></div></li>`).join('');
+    <div class="what"><strong>${e.actor.replace(/ <.*>/, '')}</strong> ${e.detail || e.type}</div>
+    <div class="meta"><a href="#/envelopes/${e.envelope_id}">${e.title}</a>, ${timeAgo(e.created_at)}</div></div></li>`).join('');
 }
 
 /* -------------------------------- lists -------------------------------- */
@@ -257,8 +257,8 @@ export function envelopeTable(envelopes, { templates = false } = {}) {
   }
   return html`<table class="list"><thead><tr><th>Subject</th><th class="hide-sm">Recipients</th><th>Status</th><th class="hide-sm">Last change</th></tr></thead><tbody>
     ${raw(envelopes.map((e) => html`<tr class="click" data-href="#/envelopes/${e.id}${e.status === 'draft' || templates ? '/edit' : ''}">
-      <td><div class="t-title">${e.title}</div><div class="t-sub">${e.recipients.length ? `To: ${e.recipients.filter((r) => r.role !== 'cc').map((r) => r.name).join(', ') || '—'}` : 'No recipients yet'}</div></td>
-      <td class="hide-sm"><div class="avatars">${raw(e.recipients.slice(0, 5).map((r) => html`<span class="avatar" style="background:${r.color}" title="${r.name} · ${r.status}">${initials(r.name) || '?'}</span>`).join(''))}</div></td>
+      <td><div class="t-title">${e.title}</div><div class="t-sub">${e.recipients.length ? `To: ${e.recipients.filter((r) => r.role !== 'cc').map((r) => r.name).join(', ') || 'No signers'}` : 'No recipients yet'}</div></td>
+      <td class="hide-sm"><div class="avatars">${raw(e.recipients.slice(0, 5).map((r) => html`<span class="avatar" style="background:${r.color}" title="${r.name}, ${r.status}">${initials(r.name) || '?'}</span>`).join(''))}</div></td>
       <td>${templates ? raw('<span class="pill pill-purple">Template</span>') : pill(STATUS, e.status)}${raw(e.status === 'sent' ? html`<div class="t-sub" style="margin-top:4px">${e.recipients.filter((r) => r.status === 'completed').length} of ${e.recipients.filter((r) => r.role !== 'cc').length} done</div>` : '')}</td>
       <td class="hide-sm"><div>${fmtDate(e.updated_at, false)}</div><div class="t-sub">${timeAgo(e.updated_at)}</div></td></tr>`).join(''))}
   </tbody></table>`;

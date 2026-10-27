@@ -122,7 +122,7 @@ export class Markup {
       n.append(t);
       return n;
     };
-    const by = `${a.author_name || 'You'}${a.created_at ? ` · ${fmtDate(a.created_at)}` : ''}`;
+    const by = `${a.author_name || 'You'}${a.created_at ? `, ${fmtDate(a.created_at)}` : ''}`;
     if (a.kind === 'pen') {
       const pts = d.points.map(([x, y]) => `${(x * W).toFixed(1)},${(y * H).toFixed(1)}`).join(' ');
       return title(mk('polyline', { points: pts, fill: 'none', stroke: d.color, 'stroke-width': (d.width || 0.003) * W, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }), by);
@@ -155,7 +155,7 @@ export class Markup {
           render: (body) => { body.innerHTML = html`<p class="note-text">${d.text}</p><p class="muted small">${by}</p>`; },
         });
       });
-      return title(g, `${d.text}\n— ${by}`);
+      return title(g, `${d.text}\n${by}`);
     }
     return null;
   }

@@ -3,7 +3,7 @@ import { api, html, raw, fmtDate } from './ui.js';
 import { icon } from './icons.js';
 
 const app = document.getElementById('app');
-app.innerHTML = html`<div class="sign-top"><img class="lockup" src="/img/lockup.png" alt="LangSync" style="height:26px"><span class="badge">Sign · Verify</span></div>
+app.innerHTML = html`<div class="sign-top"><img class="lockup" src="/img/lockup.png" alt="LangSync" style="height:26px"><span class="badge">Verify</span></div>
   <div class="verify-box">
     <div class="card card-pad rise">
       <span class="chip"><span class="chip-ic">${raw(icon('shield', 13))}</span>Document verification</span>
@@ -26,7 +26,7 @@ async function check(file) {
     result.innerHTML = r.match
       ? html`<div class="callout good">${raw(icon('checkCircle', 18))}<div><strong style="color:var(--ls-good)">Authentic and unmodified.</strong>
           <p style="margin:6px 0">"${r.envelope.title}" was completed on ${fmtDate(r.envelope.completed_at)}.</p>
-          <ul style="margin:0">${raw(r.signers.map((s) => html`<li>${s.name} (${s.role}) · ${fmtDate(s.completed_at)}</li>`).join(''))}</ul>
+          <ul style="margin:0">${raw(r.signers.map((s) => html`<li>${s.name} (${s.role}), ${fmtDate(s.completed_at)}</li>`).join(''))}</ul>
           <p class="mono" style="margin:8px 0 0">${r.sha256}</p></div></div>`
       : html`<div class="callout bad">${raw(icon('alert', 18))}<div><strong>No match.</strong> This file was not produced by LangSync Sign, or it has been modified since it was completed.<p class="mono" style="margin:8px 0 0">${r.sha256}</p></div></div>`;
   } catch (err) {

@@ -125,19 +125,25 @@ async function stampField(doc, page, map, field, ctx) {
   if (field.type === 'signature') {
     const img = await embedDataUrl(doc, recipient?.signature_image, images);
     if (!img) return;
-    // DocuSign-style frame: "Signed by:" label, the signature, and a short signer ID beneath.
+    // DocuSign-style stamp: a thin bracket down the left edge (no closed box, so it never fences in
+    // nearby text), "Signed by:" above the signature and a short signer ID below, all inside the field.
+    const label = boxH > 22 ? Math.min(5.5, boxH * 0.14) : 0;
     const pad = Math.min(3, boxH * 0.08);
-    const label = boxH > 22 ? Math.min(5.5, boxH * 0.15) : 0;
-    const availH = boxH - (label ? label * 2 + pad * 3 : pad * 2);
-    const scale = Math.min((boxW - pad * 2) / img.width, availH / img.height);
+    const inset = label ? 5 : pad;
+    const availH = boxH - (label ? label * 2.2 + pad * 3 : pad * 2);
+    const scale = Math.min((boxW - inset - pad) / img.width, availH / img.height);
     const w = img.width * scale, h = img.height * scale;
     if (label) {
-      page.drawRectangle({ ...at(map, origin), width: boxW, height: boxH, borderColor: BRAND, borderWidth: 0.9, rotate: map.rotate });
-      page.drawText('Signed by:', { ...at(map, origin, pad, boxH - pad - label), size: label, font: bold, color: INK, rotate: map.rotate });
-      const id = crypto.createHash('sha256').update(`${envelopeId}:${field.recipient_id}`).digest('hex').slice(0, 15).toUpperCase();
-      page.drawText(`${id}...`, { ...at(map, origin, pad, pad), size: label * 0.9, font, color: MID_GRAY, rotate: map.rotate });
+      const tick = Math.min(9, boxW * 0.12);
+      const line = { color: BRAND, thickness: 0.9 };
+      page.drawLine({ start: at(map, origin, 0, 0), end: at(map, origin, 0, boxH), ...line });
+      page.drawLine({ start: at(map, origin, 0, boxH), end: at(map, origin, tick, boxH), ...line });
+      page.drawLine({ start: at(map, origin, 0, 0), end: at(map, origin, tick, 0), ...line });
+      page.drawText('Signed by:', { ...at(map, origin, inset, boxH - pad - label), size: label, font: bold, color: INK, rotate: map.rotate });
+      const id = crypto.createHash('sha256').update(`${envelopeId}:${field.recipient_id}`).digest('hex').slice(0, 12).toUpperCase();
+      page.drawText(id, { ...at(map, origin, inset, pad), size: label * 0.85, font, color: MID_GRAY, rotate: map.rotate });
     }
-    page.drawImage(img, { ...at(map, origin, pad, label ? pad * 2 + label + (availH - h) / 2 : (boxH - h) / 2), width: w, height: h, rotate: map.rotate });
+    page.drawImage(img, { ...at(map, origin, inset, label ? pad * 2 + label * 1.1 + (availH - h) / 2 : (boxH - h) / 2), width: w, height: h, rotate: map.rotate });
     return;
   }
 
@@ -230,7 +236,7 @@ function stampAnnotation(page, map, ann, ctx, noteNumber) {
   }
 }
 
-const fmt = (iso) => (iso ? new Date(iso).toUTCString().replace('GMT', 'UTC') : '—');
+const fmt = (iso) => (iso ? new Date(iso).toUTCString().replace('GMT', 'UTC') : 'Not recorded');
 
 /** Simple flowing text layout used for the certificate of completion. */
 class Writer {
@@ -252,9 +258,12 @@ class Writer {
   ensure(h) {
     if (this.y - h < this.margin + 20) this.newPage();
   }
-  text(str, { size = 10, font = this.fonts.font, color = GRAY, indent = 0, gap = 4, width } = {}) {
+  text(str, { size = 10, font = this.fonts.font, color = GRAY, indent = 0, gap = 4, width, keep = false } = {}) {
     const maxW = (width || 612 - this.margin * 2) - indent;
-    for (const line of wrap(this.fonts.clean(str), font, size, maxW)) {
+    const lines = wrap(this.fonts.clean(str), font, size, maxW);
+    // keep: move the whole paragraph to the next page rather than leaving a line stranded there.
+    if (keep) this.ensure(lines.length * (size + gap));
+    for (const line of lines) {
       this.ensure(size + gap);
       this.page.drawText(line, { x: this.margin + indent, y: this.y - size, size, font, color });
       this.y -= size + gap;
@@ -308,7 +317,7 @@ function wrap(text, font, size, maxW) {
 const ROLE_LABEL = { signer: 'Needs to sign', approver: 'Needs to approve', cc: 'Receives a copy' };
 
 async function addCertificate(doc, fonts, { envelope, owner, documents, recipients, events, notes, images }) {
-  const w = new Writer(doc, fonts, `${config.appName} · Certificate of Completion · Envelope ${envelope.id}`);
+  const w = new Writer(doc, fonts, `${config.appName} Certificate of Completion, envelope ${envelope.id}`);
   const { bold, font } = fonts;
   w.text('Certificate of Completion', { size: 22, font: bold, color: INK, gap: 8 });
   w.text(`${envelope.title}`, { size: 13, font: bold, color: BRAND, gap: 10 });
@@ -322,7 +331,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
   w.rule();
   w.text('Documents', { size: 12, font: bold, color: BRAND, gap: 6 });
   for (const d of documents) {
-    w.text(`${d.name} — ${d.page_count} page${d.page_count === 1 ? '' : 's'}`, { size: 9.5, font: bold });
+    w.text(`${d.name}, ${d.page_count} page${d.page_count === 1 ? '' : 's'}`, { size: 9.5, font: bold });
     w.text(`Original SHA-256: ${d.sha256}`, { size: 8, color: MID_GRAY, gap: 6 });
   }
 
@@ -332,7 +341,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
     const sigImg = r.signature_image ? await embedDataUrl(doc, r.signature_image, images) : null;
     w.ensure(sigImg ? 96 : 70);
     w.text(`${r.name} <${r.email}>`, { size: 10, font: bold, color: INK, gap: 3 });
-    w.text(`${ROLE_LABEL[r.role] || r.role} · Routing order ${r.routing_order} · Status: ${r.status}`, { size: 8.5, gap: 3 });
+    w.text(`${ROLE_LABEL[r.role] || r.role}, routing order ${r.routing_order}, status: ${r.status}`, { size: 8.5, gap: 3 });
     const auth = r.access_code ? 'Email link + access code' : 'Email link';
     w.text(`Authentication: ${auth}`, { size: 8.5, gap: 3 });
     if (sigImg) {
@@ -358,7 +367,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
     w.rule();
     w.text('Comments', { size: 12, font: bold, color: BRAND, gap: 6 });
     notes.forEach((n, i) => {
-      w.text(`#${i + 1} · ${n.author_name} · ${n.docName}, page ${n.page + 1} · ${fmt(n.created_at)}`, { size: 8.5, font: bold, gap: 2 });
+      w.text(`#${i + 1} ${n.author_name}, ${n.docName}, page ${n.page + 1}, ${fmt(n.created_at)}`, { size: 8.5, font: bold, gap: 2 });
       w.text(n.data.text || '', { size: 9, indent: 10, gap: 6 });
     });
   }
@@ -371,7 +380,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
       { text: new Date(e.created_at).toISOString().replace('T', ' ').slice(0, 19), width: 140 },
       { text: e.actor, width: 120 },
       { text: e.type, width: 90 },
-      { text: [e.detail, e.ip ? `IP ${e.ip}` : ''].filter(Boolean).join(' · '), width: 166 },
+      { text: [e.detail, e.ip ? `IP ${e.ip}` : ''].filter(Boolean).join(', '), width: 166 },
     ]);
   }
 
@@ -380,7 +389,7 @@ async function addCertificate(doc, fonts, { envelope, owner, documents, recipien
     'Each recipient agreed to conduct business electronically and to use electronic signatures before signing. ' +
       'Electronic signatures are intended to be legally binding under the U.S. ESIGN Act, UETA, and eIDAS (simple electronic signature). ' +
       'Timestamps are recorded by the LangSync Sign server. The SHA-256 fingerprint of this completed file can be checked on the Verify page.',
-    { size: 8, color: MID_GRAY }
+    { size: 8, color: MID_GRAY, keep: true }
   );
 
   w.pages.forEach((p, i) =>

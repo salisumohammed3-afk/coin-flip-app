@@ -27,7 +27,7 @@ async function load() {
   } catch (err) {
     return card('alert', 'This link is not valid', err.message, '', 'bad');
   }
-  document.title = `${data.envelope.title} · LangSync Sign`;
+  document.title = `${data.envelope.title} - LangSync Sign`;
   if (data.needsCode) return renderCode(data);
   if (new URLSearchParams(location.search).get('download') === '1' && data.mode === 'completed') location.href = `${base}/download`;
 
@@ -57,58 +57,7 @@ function renderCode(data) {
     e.preventDefault();
     try {
       await api('POST', `${base}/access`, { code: form.code.value });
-      /* ------------------------------- helpers -------------------------------- */
-
-// DocuSign-style frame around an adopted signature.
-const signedFrame = (img) => html`<div class="signed-frame"><span class="sf-label">Signed by:</span><img src="${img}" alt="Signature"></div>`;
-
-function pickStamp() {
-  return new Promise((resolve) => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,image/jpeg' });
-    input.onchange = () => {
-      const file = input.files[0];
-      if (!file) return resolve(null);
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, 600 / Math.max(img.width, img.height));
-        const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/png'));
-      };
-      img.onerror = () => { toast('That image could not be read.', { type: 'error' }); resolve(null); };
-      img.src = URL.createObjectURL(file);
-    };
-    input.click();
-  });
-}
-
-function downloadDocs(data) {
-  if (data.envelope.has_final) return (location.href = `${base}/download`);
-  for (const d of data.documents) window.open(`${base}/documents/${d.id}?download=1`, '_blank', 'noopener');
-}
-
-async function printPages(pages) {
-  toast('Preparing pages for printing…');
-  await Promise.all(pages.map((p) => p.el.__render(true)));
-  window.print();
-}
-
-function showPages(pages, documents) {
-  modal({
-    title: 'Pages',
-    render(body, close) {
-      body.innerHTML = documents.map((d) => html`<h3 style="margin:8px 0">${d.name}</h3><div class="page-list">${raw(
-        pages.filter((p) => p.docId === d.id).map((p) => html`<button class="btn ghost small" data-go="${pages.indexOf(p)}">Page ${p.index + 1}</button>`).join('')
-      )}</div>`).join('');
-      body.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => {
-        pages[Number(b.dataset.go)].el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        close();
-      }));
-    },
-  });
-}
-
-load();
+      load();
     } catch (err) {
       form.querySelector('.err').textContent = err.message;
     }
@@ -117,7 +66,7 @@ load();
 
 function header(data, right = '') {
   return html`<div class="sign-top">${raw(LOCKUP)}<span class="divider"></span>
-    <div><div class="title">${data.envelope.title}</div><div class="from">From ${data.owner.name} · ${data.owner.email}</div></div>
+    <div><div class="title">${data.envelope.title}</div><div class="from">From ${data.owner.name} (${data.owner.email})</div></div>
     <div class="spacer"></div>${raw(right)}</div>`;
 }
 

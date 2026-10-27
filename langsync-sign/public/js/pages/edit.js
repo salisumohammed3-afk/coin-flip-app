@@ -26,7 +26,7 @@ export async function renderEditStep(view, id) {
       <div class="section-title"><span class="tile">${raw(icon('file', 18))}</span><div><h2>Documents</h2><p class="muted small">Everything in this package</p></div></div>
       <label class="dropzone" data-drop>
         <span class="tile tile-lg">${raw(icon('upload', 24))}</span><div><strong>Drop files here</strong> or click to upload</div>
-        <div class="muted small">PDF, PNG or JPG · up to 10 files at a time · documents are combined into one package</div>
+        <div class="muted small">PDF, PNG or JPG, up to 10 files at a time, documents are combined into one package</div>
         <input type="file" multiple accept="application/pdf,image/png,image/jpeg" hidden data-file>
       </label>
       <ul class="doc-list" data-docs></ul>
@@ -34,7 +34,7 @@ export async function renderEditStep(view, id) {
 
     <div class="card card-pad" style="margin-bottom:18px">
       <div class="recipient-head"><div class="section-title" style="margin:0"><span class="tile">${raw(icon('users', 18))}</span><div><h2>Recipients</h2><p class="muted small">Signers, approvers and people who get a copy</p></div></div>
-        <label class="check" style="margin:0"><input type="checkbox" data-seq ${env.sequential ? 'checked' : ''}><span><strong>Set signing order</strong> <span class="muted small">— recipients act one after another</span></span></label></div>
+        <label class="check" style="margin:0"><input type="checkbox" data-seq ${env.sequential ? 'checked' : ''}><span><strong>Set signing order</strong> <span class="muted small">recipients act one after another</span></span></label></div>
       <div data-recipients></div>
       <div class="actions-row"><button class="btn ghost small" data-add>${raw(icon('plus', 15))}Add recipient</button><button class="btn ghost small" data-add-me>${raw(icon('user', 15))}Add me</button></div>
     </div>
@@ -67,7 +67,7 @@ export async function renderEditStep(view, id) {
   /* ---------- documents ---------- */
   const renderDocs = () => {
     $('[data-docs]').innerHTML = env.documents.map((d) => html`<li><span class="doc-icon">PDF</span><div class="grow"><div class="t-title">${d.name}</div>
-      <div class="t-sub">${d.page_count} page${d.page_count === 1 ? '' : 's'} · ${fmtSize(d.size)}</div></div>
+      <div class="t-sub">${d.page_count} page${d.page_count === 1 ? '' : 's'}, ${fmtSize(d.size)}</div></div>
       <a class="btn ghost small" target="_blank" rel="noopener" href="/api/envelopes/${env.id}/documents/${d.id}/file">Preview</a>
       <button class="icon-btn" data-rm="${d.id}" title="Remove" aria-label="Remove ${d.name}">${raw(icon('trash', 17))}</button></li>`).join('');
     view.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => {

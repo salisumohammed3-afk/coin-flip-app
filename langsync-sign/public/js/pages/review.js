@@ -28,15 +28,15 @@ export async function renderReview(view, id) {
           const n = env.fields.filter((f) => f.recipient_id === r.id).length;
           return html`<li style="--c:${r.color}"><span class="ord">${env.sequential ? r.routing_order : '•'}</span>
             <div><div class="t-title">${r.name}</div><div class="t-sub">${r.email || 'Email added when the template is used'}</div>
-            <div class="t-sub">${ROLE_LABEL[r.role]}${r.role === 'cc' ? '' : ` · ${n} field${n === 1 ? '' : 's'}`}${r.access_code ? ' · access code' : ''}</div></div><span></span></li>`;
+            <div class="t-sub">${ROLE_LABEL[r.role]}${r.role === 'cc' ? '' : `, ${n} field${n === 1 ? '' : 's'}`}${r.access_code ? ', access code' : ''}</div></div><span></span></li>`;
         }).join(''))}</ul>
       </div>
       <div style="display:grid;gap:18px">
         <div class="card card-pad"><h2 style="margin-bottom:10px">Documents</h2>
           ${raw(env.documents.map((d) => html`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="doc-icon">PDF</span><span>${d.name}</span><span class="muted small">${d.page_count}p</span></div>`).join(''))}
-          <p class="muted small">${env.annotations.length} markup item${env.annotations.length === 1 ? '' : 's'} · ${env.fields.length} field${env.fields.length === 1 ? '' : 's'}</p></div>
+          <p class="muted small">${env.annotations.length} markup item${env.annotations.length === 1 ? '' : 's'}, ${env.fields.length} field${env.fields.length === 1 ? '' : 's'}</p></div>
         <div class="card card-pad"><h2 style="margin-bottom:10px">Email</h2>
-          <dl class="kv"><dt>Subject</dt><dd>${env.subject || `Please sign: ${env.title}`}</dd><dt>Message</dt><dd style="white-space:pre-wrap">${env.message || '—'}</dd>
+          <dl class="kv"><dt>Subject</dt><dd>${env.subject || `Please sign: ${env.title}`}</dd><dt>Message</dt><dd style="white-space:pre-wrap">${env.message || 'No message'}</dd>
           <dt>Expires</dt><dd>${env.expires_days ? `${env.expires_days} days after sending` : 'Never'}</dd>
           <dt>Reminders</dt><dd>${env.reminder_days ? `Every ${env.reminder_days} days` : 'Off'}</dd>
           <dt>Markup</dt><dd>${env.allow_markup ? 'Recipients can mark up' : 'Off'}</dd></dl></div>

@@ -37,7 +37,7 @@ function render(m) {
             <td valign="top" style="padding-right:14px"><div style="width:44px;height:52px;border-radius:8px;background:#fff;border:1px solid ${C.line};text-align:center;line-height:52px;font:700 11px ${FONT};color:${C.bad};letter-spacing:.04em">PDF</div></td>
             <td valign="top">
               <div style="font:600 16px/1.35 ${DISPLAY};color:${C.ink}">${esc(m.document.title)}</div>
-              ${files.length ? `<div style="font:400 13px/1.5 ${FONT};color:${C.muted};margin-top:4px">${files.map((f) => `${esc(f.name)}${f.pages ? ` · ${f.pages} page${f.pages === 1 ? '' : 's'}` : ''}`).join('<br>')}</div>` : ''}
+              ${files.length ? `<div style="font:400 13px/1.5 ${FONT};color:${C.muted};margin-top:4px">${files.map((f) => `${esc(f.name)}${f.pages ? `, ${f.pages} page${f.pages === 1 ? '' : 's'}` : ''}`).join('<br>')}</div>` : ''}
               ${m.badge ? `<div style="margin-top:10px"><span style="display:inline-block;padding:3px 10px;border-radius:99px;background:${toneWash};color:${toneInk};font:600 12px ${FONT}">${esc(m.badge)}</span></div>` : ''}
             </td></tr></table>
         </td></tr>
@@ -95,7 +95,7 @@ function render(m) {
       Sent with ${esc(config.appName)}${m.sender ? ` on behalf of ${esc(m.sender.name)}` : ''}. Electronic signatures are legally binding under the ESIGN Act, UETA and eIDAS.
     </td></tr>
   </table>
-  <div style="font:400 11px ${FONT};color:${C.muted};padding-top:16px">LangSync · ${esc(config.baseUrl.replace(/^https?:\/\//, ''))}</div>
+  <div style="font:400 11px ${FONT};color:${C.muted};padding-top:16px">LangSync, ${esc(config.baseUrl.replace(/^https?:\/\//, ''))}</div>
 </td></tr></table></body></html>`;
 }
 
