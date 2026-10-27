@@ -67,9 +67,48 @@ SMTP_USER=sign@langsync.ai SMTP_PASS='app-password' \
 MAIL_FROM='LangSync Sign <sign@langsync.ai>' npm start
 ```
 
-## Deploying
+## Deploying (production: Vercel + Supabase at sign.langsync.ai)
 
-The app is a single process with a data folder, so any small VM works: Fly.io, Railway or Render (with a persistent volume), or a $5 VPS.
+Production runs on Vercel (`vercel.json`), with data in the **LangSync Platform** Supabase project:
+- The database is the `sign` schema: 9 tables with RLS on and no access for the `anon` or `authenticated` roles. The migration is already applied.
+- Files go in the private storage bucket `langsync-sign`, which is already created.
+- Email is sent through Resend.
+- Locally, with no `DATABASE_URL`, the app uses SQLite and the `data/` folder instead.
+
+### 1. Create the Vercel project
+Vercel → *Add New → Project* → import `salisumohammed3-afk/coin-flip-app`:
+- **Root Directory:** `langsync-sign`
+- **Framework preset:** Other. `vercel.json` sets the build, `/api` function, rewrites, security headers and the daily cron.
+- **Production branch:** the code lives on `claude/happy-shannon-402n4d`. Either merge it into `main`, or set the production branch under *Settings → Git*.
+
+### 2. Environment variables (Settings → Environment Variables, Production)
+| Variable | Value |
+| --- | --- |
+| `BASE_URL` | `https://sign.langsync.ai` |
+| `SUPABASE_URL` | `https://bpgeqyhlghwzanwxntub.supabase.co` |
+| `DATABASE_URL` 🔒 | Supabase → LangSync Platform → *Connect* → **Transaction pooler** URI (port 6543), with your DB password filled in |
+| `SUPABASE_SERVICE_ROLE_KEY` 🔒 | Supabase → LangSync Platform → *Project Settings → API Keys* → `service_role` (secret) |
+| `RESEND_API_KEY` 🔒 | Resend → *API Keys* → create one with sending access |
+| `MAIL_FROM` | `LangSync Sign <sign@langsync.ai>` |
+| `SIGNUP_DOMAINS` | `langsync.ai` (only LangSync staff can create sender accounts) |
+| `CRON_SECRET` 🔒 (optional) | Any long random string; Vercel Cron sends it automatically |
+
+Until the 🔒 database and storage secrets are set, the deployment shows an "Almost there" screen and refuses to store anything.
+
+### 3. Domain: sign.langsync.ai
+In the Vercel project, open *Settings → Domains* and add `sign.langsync.ai`. Then in **GoDaddy → langsync.ai → DNS → Add record**:
+
+| Type | Name | Value | TTL |
+| --- | --- | --- | --- |
+| CNAME | `sign` | `cname.vercel-dns.com` | 1 hour |
+
+This is the same setup as `hub` and `onboarding`. If Vercel also shows a TXT verification record (`_vercel`), add that too. HTTPS is issued automatically within a few minutes.
+
+### 4. Email: verify langsync.ai in Resend
+In Resend, open *Domains → Add domain* and enter `langsync.ai`. Resend then shows its records: an MX and an SPF TXT on the `send` subdomain, and a DKIM TXT at `resend._domainkey`. Add each one in GoDaddy exactly as shown, then click *Verify*. Until the domain is verified, Resend rejects mail from `sign@langsync.ai`, and the Outbox page shows those emails as failed.
+
+### Other hosts
+Any small VM with a persistent disk also works without Supabase:
 
 ```bash
 docker build -t langsync-sign .
@@ -77,9 +116,7 @@ docker run -d -p 3000:3000 -v langsync-sign-data:/app/data \
   -e BASE_URL=https://sign.langsync.ai -e SIGNUP_DOMAINS=langsync.ai langsync-sign
 ```
 
-Put it behind HTTPS (Caddy, nginx, or your platform's TLS). Signing links are secrets: they're sent with `Referrer-Policy: no-referrer`, and correcting a recipient rotates their link.
-
-Serverless platforms without a persistent disk (e.g. plain Vercel functions) won't work as-is, because the app keeps its SQLite database and files on local disk.
+Signing links are secrets: they're sent with `Referrer-Policy: no-referrer`, and correcting a recipient rotates their link.
 
 ## Design
 
