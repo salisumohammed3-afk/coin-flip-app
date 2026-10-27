@@ -68,14 +68,29 @@ export function placeBox(node, f) {
   node.style.height = `${f.h * 100}%`;
 }
 
+// Default sizes are px on a US Letter page at 96dpi (scaled to the real page on drop).
 export const FIELD_TYPES = {
   signature: { label: 'Signature', svg: 'pen', w: 170, h: 46 },
-  initials: { label: 'Initials', icon: 'AB', w: 64, h: 40 },
-  date_signed: { label: 'Date signed', svg: 'calendar', w: 120, h: 24 },
-  full_name: { label: 'Full name', svg: 'user', w: 170, h: 24 },
-  email: { label: 'Email', svg: 'at', w: 190, h: 24 },
+  initials: { label: 'Initial', icon: 'AZ', w: 64, h: 40 },
+  date_signed: { label: 'Date Signed', svg: 'calendar', w: 120, h: 24 },
+  full_name: { label: 'Name', svg: 'user', w: 170, h: 24 },
+  email: { label: 'Email', svg: 'mail', w: 190, h: 24 },
   company: { label: 'Company', svg: 'building', w: 170, h: 24 },
-  title: { label: 'Title', svg: 'briefcase', w: 150, h: 24 },
+  title: { label: 'Title', svg: 'idCard', w: 150, h: 24 },
   text: { label: 'Text', svg: 'type', w: 170, h: 24 },
   checkbox: { label: 'Checkbox', svg: 'squareCheck', w: 20, h: 20 },
+  dropdown: { label: 'Dropdown', svg: 'chevronSquare', w: 170, h: 26 },
+  radio: { label: 'Radio', svg: 'radio', w: 20, h: 20 },
+  date: { label: 'Date', svg: 'calendarPlus', w: 130, h: 26 },
+  approve: { label: 'Approve', svg: 'check', w: 110, h: 30 },
+  decline: { label: 'Decline', svg: 'ban', w: 110, h: 30 },
+  stamp: { label: 'Stamp', svg: 'stamp', w: 120, h: 120 },
 };
+
+// Grouped like DocuSign's "Standard Fields" panel.
+export const FIELD_GROUPS = [
+  ['Signature', ['signature', 'initials', 'date_signed']],
+  ['Contact Information', ['full_name', 'email', 'company', 'title']],
+  ['Inputs', ['text', 'checkbox', 'dropdown', 'radio', 'date']],
+  ['Actions', ['approve', 'decline', 'stamp']],
+];

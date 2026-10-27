@@ -57,7 +57,58 @@ function renderCode(data) {
     e.preventDefault();
     try {
       await api('POST', `${base}/access`, { code: form.code.value });
-      load();
+      /* ------------------------------- helpers -------------------------------- */
+
+// DocuSign-style frame around an adopted signature.
+const signedFrame = (img) => html`<div class="signed-frame"><span class="sf-label">Signed by:</span><img src="${img}" alt="Signature"></div>`;
+
+function pickStamp() {
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,image/jpeg' });
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return resolve(null);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 600 / Math.max(img.width, img.height));
+        const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.onerror = () => { toast('That image could not be read.', { type: 'error' }); resolve(null); };
+      img.src = URL.createObjectURL(file);
+    };
+    input.click();
+  });
+}
+
+function downloadDocs(data) {
+  if (data.envelope.has_final) return (location.href = `${base}/download`);
+  for (const d of data.documents) window.open(`${base}/documents/${d.id}?download=1`, '_blank', 'noopener');
+}
+
+async function printPages(pages) {
+  toast('Preparing pages for printing…');
+  await Promise.all(pages.map((p) => p.el.__render(true)));
+  window.print();
+}
+
+function showPages(pages, documents) {
+  modal({
+    title: 'Pages',
+    render(body, close) {
+      body.innerHTML = documents.map((d) => html`<h3 style="margin:8px 0">${d.name}</h3><div class="page-list">${raw(
+        pages.filter((p) => p.docId === d.id).map((p) => html`<button class="btn ghost small" data-go="${pages.indexOf(p)}">Page ${p.index + 1}</button>`).join('')
+      )}</div>`).join('');
+      body.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => {
+        pages[Number(b.dataset.go)].el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        close();
+      }));
+    },
+  });
+}
+
+load();
     } catch (err) {
       form.querySelector('.err').textContent = err.message;
     }
@@ -93,8 +144,11 @@ function drawReadonlyFields(pages, fields) {
     if (!page) continue;
     const node = el('<div class="sfld ro filled"></div>');
     placeBox(node, f);
-    if (f.image) node.innerHTML = html`<div class="sig-wrap">${raw(f.type === 'signature' ? '<span class="tag">LangSync Sign</span>' : '')}<img src="${f.image}" alt=""></div>`;
+    if (f.image) node.innerHTML = f.type === 'signature' ? signedFrame(f.image) : html`<img src="${f.image}" alt="">`;
     else if (f.type === 'checkbox') node.innerHTML = html`<span class="val">${f.value === 'true' ? '☑' : '☐'}</span>`;
+    else if (f.type === 'radio') node.innerHTML = html`<span class="val">${f.value === 'true' ? '◉' : '○'}</span>`;
+    else if (f.type === 'approve') node.innerHTML = f.value ? '<span class="approved-tag">APPROVED</span>' : '';
+    else if (f.type === 'decline') node.innerHTML = '';
     else node.innerHTML = html`<span class="val">${f.value}</span>`;
     page.overlay.append(node);
   }
@@ -113,10 +167,27 @@ async function renderSigning(data) {
   const finishLabel = isApprover ? 'Approve' : 'Finish';
 
   app.innerHTML = html`${raw(header(data, html`<span class="progress" data-progress></span>
-      <button class="btn ghost small" data-decline>${raw(icon('xCircle', 15))}Decline</button>
-      <button class="btn primary" data-finish>${finishLabel}</button>`))}
+      <div class="split">
+        <button class="btn primary" data-finish>${finishLabel}</button><button class="btn primary split-caret" data-menu-toggle aria-label="More options" aria-haspopup="menu">${raw(icon('chevronDown', 16))}</button>
+        <div class="menu" data-menu role="menu" hidden>
+          <button role="menuitem" data-later>${raw(icon('clock', 16))}Finish later</button>
+          <button role="menuitem" data-decline>${raw(icon('xCircle', 16))}Decline to sign</button>
+          <button role="menuitem" data-dl>${raw(icon('download', 16))}Download documents</button>
+          <button role="menuitem" data-print>${raw(icon('printer', 16))}Print</button>
+        </div>
+      </div>`))}
     <div class="sign-banner" data-banner></div>
     <div class="sign-stage"><div class="docs" data-docs><div class="empty">Loading documents…</div></div></div>
+    <aside class="sign-rail" aria-label="Document tools">
+      <button data-pages>${raw(icon('pages', 20))}<span>View pages</span></button>
+      <button data-dl>${raw(icon('download', 20))}<span>Download</span></button>
+      <button data-print>${raw(icon('printer', 20))}<span>Print</span></button>
+      <div class="rail-zoom"><button data-zoom="1" aria-label="Zoom in">${raw(icon('zoomIn', 20))}</button><span data-zoom-label>100%</span><button data-zoom="-1" aria-label="Zoom out">${raw(icon('zoomOut', 20))}</button></div>
+    </aside>
+    <div class="ready-bar" data-ready hidden>
+      <div><h3>Ready to ${finishLabel.toLowerCase()}?</h3><p>You've completed the required fields. Review your work, then select ${finishLabel}.</p></div>
+      <button class="btn primary" data-finish-bar>${finishLabel}</button>
+    </div>
     <button class="next-btn" data-next hidden>Start</button>
     ${raw(envelope.allow_markup ? `<div class="sign-tools" data-tools><button class="btn ghost small" data-toggle-markup>${icon('pen', 15)}<span>Mark up / comment</span></button><div data-bar hidden></div></div>` : '')}`;
   const $ = (s) => app.querySelector(s);
@@ -147,12 +218,15 @@ async function renderSigning(data) {
   const pages = await renderDocuments($('[data-docs]'), data.documents, (d) => `${base}/documents/${d.id}`);
   drawReadonlyFields(pages, data.fields);
 
-  const required = (f) => f.required && !['date_signed', 'email'].includes(f.type);
+  const AUTO = ['date_signed', 'email', 'approve', 'decline'];
+  const groupOf = (f) => myFields.filter((x) => x.type === 'radio' && (x.label || x.id) === (f.label || f.id));
+  const required = (f) => (f.type === 'radio' ? groupOf(f).some((x) => x.required) : f.required && !AUTO.includes(f.type));
   const isFilled = (f) => {
     if (f.type === 'signature') return values[f.id] === 'signed';
     if (f.type === 'initials') return values[f.id] === 'initialed';
     if (f.type === 'checkbox') return values[f.id] === 'true';
-    if (['date_signed', 'email'].includes(f.type)) return true;
+    if (f.type === 'radio') return groupOf(f).some((x) => values[x.id] === 'true');
+    if (AUTO.includes(f.type)) return true;
     return Boolean(String(values[f.id] || '').trim());
   };
 
@@ -175,7 +249,7 @@ async function renderSigning(data) {
     if (f.type === 'signature' || f.type === 'initials') {
       const img = f.type === 'signature' ? signature : initials;
       node.innerHTML = filled && img
-        ? html`<button class="sigbtn" title="Click to remove"><div class="sig-wrap">${raw(f.type === 'signature' ? '<span class="tag">LangSync Sign</span>' : '')}<img src="${img}" alt="Your ${f.type}"></div></button>`
+        ? html`<button class="sigbtn" title="Click to remove">${raw(f.type === 'signature' ? signedFrame(img) : html`<img src="${img}" alt="Your initials">`)}</button>`
         : html`<button class="sigbtn">${raw(icon('pen', 14))}<span>${f.type === 'signature' ? 'Sign' : 'Initial'}</span></button>`;
       node.querySelector('button').onclick = async () => {
         if (!consented) return toast('Please agree to use electronic signatures first.');
@@ -192,7 +266,50 @@ async function renderSigning(data) {
         nextField();
       };
     } else if (f.type === 'date_signed') {
-      node.innerHTML = html`<span class="val">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>`;
+      node.innerHTML = html`<span class="val">${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>`;
+    } else if (f.type === 'radio') {
+      if (!node.querySelector('input')) {
+        node.innerHTML = html`<input type="radio" name="grp-${f.label || f.id}" aria-label="${f.label}: ${f.options?.[0] || 'Option'}" title="${f.options?.[0] || ''}">`;
+        node.querySelector('input').onchange = () => {
+          for (const x of groupOf(f)) values[x.id] = x.id === f.id ? 'true' : 'false';
+          groupOf(f).forEach(paintField);
+          update();
+        };
+      }
+      node.className = `sfld radio ${isFilled(f) ? 'filled' : required(f) ? 'todo' : 'todo optional'}`;
+      node.querySelector('input').checked = values[f.id] === 'true';
+    } else if (f.type === 'dropdown') {
+      if (!node.querySelector('select')) {
+        node.innerHTML = html`<select aria-label="${f.label || 'Choose an option'}"><option value="">${f.label || 'Choose…'}</option>${raw((f.options || []).map((o) => html`<option>${o}</option>`).join(''))}</select>`;
+        node.querySelector('select').onchange = (e) => { values[f.id] = e.target.value; paintField(f); update(); };
+      }
+    } else if (f.type === 'date') {
+      if (!node.querySelector('input')) {
+        node.innerHTML = html`<input type="date" aria-label="${f.label || 'Date'}">`;
+        node.querySelector('input').onchange = (e) => { values[f.id] = e.target.value; paintField(f); update(); };
+      }
+    } else if (f.type === 'approve') {
+      node.className = 'sfld action';
+      node.innerHTML = html`<button class="act-btn approve">${raw(icon('check', 15))}Approve</button>`;
+      node.querySelector('button').onclick = () => finish();
+    } else if (f.type === 'decline') {
+      node.className = 'sfld action';
+      node.innerHTML = html`<button class="act-btn decline">${raw(icon('ban', 15))}Decline</button>`;
+      node.querySelector('button').onclick = () => decline();
+    } else if (f.type === 'stamp') {
+      node.innerHTML = values[f.id]
+        ? html`<button class="sigbtn" title="Click to remove"><img src="${values[f.id]}" alt="Your stamp"></button>`
+        : html`<button class="sigbtn">${raw(icon('stamp', 16))}<span>Stamp</span></button>`;
+      node.querySelector('button').onclick = async () => {
+        if (!consented) return toast('Please agree to use electronic signatures first.');
+        if (values[f.id]) { values[f.id] = ''; paintField(f); return update(); }
+        const img = await pickStamp();
+        if (!img) return;
+        values[f.id] = img;
+        paintField(f);
+        update();
+        nextField();
+      };
     } else if (f.type === 'email') {
       node.innerHTML = html`<span class="val">${recipient.email}</span>`;
     } else if (f.type === 'checkbox') {
@@ -215,7 +332,8 @@ async function renderSigning(data) {
     }
   }
 
-  const remaining = () => myFields.filter((f) => required(f) && !isFilled(f));
+  // Radio groups count once, via their first button.
+  const remaining = () => myFields.filter((f) => required(f) && !isFilled(f) && (f.type !== 'radio' || groupOf(f)[0] === f));
   function update() {
     const req = myFields.filter(required);
     const left = remaining().length;
@@ -226,6 +344,7 @@ async function renderSigning(data) {
     next.hidden = !consented || !left;
     next.textContent = req.length - left === 0 ? 'Start' : 'Next';
     $('[data-finish]').classList.toggle('accent', consented && !left);
+    $('[data-ready]').hidden = !consented || left > 0;
   }
 
   function nextField() {
@@ -262,8 +381,27 @@ async function renderSigning(data) {
     new Markup(pages, { items: data.annotations, author: { type: 'recipient', id: recipient.id, name: recipient.name } });
   }
 
+  /* tools: menu, pages, download, print, zoom */
+  const menu = $('[data-menu]');
+  $('[data-menu-toggle]').onclick = () => (menu.hidden = !menu.hidden);
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.split')) menu.hidden = true; });
+  $('[data-later]').onclick = () => {
+    menu.hidden = true;
+    card('clock', 'Come back any time', `Your progress isn't saved, but "${envelope.title}" stays waiting for you. Use the link in your email to sign it later.`);
+  };
+  app.querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => { menu.hidden = true; downloadDocs(data); }));
+  app.querySelectorAll('[data-print]').forEach((b) => (b.onclick = () => { menu.hidden = true; printPages(pages); }));
+  $('[data-pages]').onclick = () => showPages(pages, data.documents);
+  let zoom = 1;
+  app.querySelectorAll('[data-zoom]').forEach((b) => (b.onclick = () => {
+    zoom = Math.min(2, Math.max(0.6, +(zoom + Number(b.dataset.zoom) * 0.2).toFixed(1)));
+    $('[data-docs]').style.maxWidth = `${880 * zoom}px`;
+    $('[data-zoom-label]').textContent = `${Math.round(zoom * 100)}%`;
+    window.dispatchEvent(new Event('resize'));
+  }));
+
   /* finish & decline */
-  $('[data-finish]').onclick = async (e) => {
+  const finish = async (e) => {
     if (!consented) return toast('Please agree to use electronic signatures first.', { type: 'error' });
     const left = remaining();
     if (left.length) {
@@ -277,7 +415,8 @@ async function renderSigning(data) {
       confirmLabel: finishLabel,
     });
     if (!ok) return;
-    e.target.disabled = true;
+    const btns = app.querySelectorAll('[data-finish], [data-finish-bar]');
+    btns.forEach((b) => (b.disabled = true));
     try {
       const res = await api('POST', `${base}/complete`, { values, signature, initials, annotations: marks });
       document.body.classList.remove('markup-active');
@@ -287,12 +426,15 @@ async function renderSigning(data) {
           : `Thanks, ${recipient.name}. ${data.owner.name} has been notified. We'll email you the completed copy once everyone has finished.`,
         res.status === 'completed' ? html`<a class="btn primary" href="${base}/download">${raw(icon('download', 17))}Download signed PDF</a>` : '', 'good');
     } catch (err) {
-      e.target.disabled = false;
+      btns.forEach((b) => (b.disabled = false));
       toast(err.message, { type: 'error' });
     }
   };
+  $('[data-finish]').onclick = finish;
+  $('[data-finish-bar]').onclick = finish;
 
-  $('[data-decline]').onclick = async () => {
+  const decline = async () => {
+    menu.hidden = true;
     const reason = await confirmDialog({
       title: 'Decline to sign?', danger: true, confirmLabel: 'Decline',
       message: `${data.owner.name} will be notified and the envelope will be cancelled for everyone.`,
@@ -302,9 +444,61 @@ async function renderSigning(data) {
     await api('POST', `${base}/decline`, { reason });
     card('xCircle', 'You declined to sign', `${data.owner.name} has been notified.`, '', 'bad');
   };
+  $('[data-decline]').onclick = decline;
 
   renderBanner();
   update();
+}
+
+/* ------------------------------- helpers -------------------------------- */
+
+// DocuSign-style frame around an adopted signature.
+const signedFrame = (img) => html`<div class="signed-frame"><span class="sf-label">Signed by:</span><img src="${img}" alt="Signature"></div>`;
+
+function pickStamp() {
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,image/jpeg' });
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return resolve(null);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 600 / Math.max(img.width, img.height));
+        const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.onerror = () => { toast('That image could not be read.', { type: 'error' }); resolve(null); };
+      img.src = URL.createObjectURL(file);
+    };
+    input.click();
+  });
+}
+
+function downloadDocs(data) {
+  if (data.envelope.has_final) return (location.href = `${base}/download`);
+  for (const d of data.documents) window.open(`${base}/documents/${d.id}?download=1`, '_blank', 'noopener');
+}
+
+async function printPages(pages) {
+  toast('Preparing pages for printing…');
+  await Promise.all(pages.map((p) => p.el.__render(true)));
+  window.print();
+}
+
+function showPages(pages, documents) {
+  modal({
+    title: 'Pages',
+    render(body, close) {
+      body.innerHTML = documents.map((d) => html`<h3 style="margin:8px 0">${d.name}</h3><div class="page-list">${raw(
+        pages.filter((p) => p.docId === d.id).map((p) => html`<button class="btn ghost small" data-go="${pages.indexOf(p)}">Page ${p.index + 1}</button>`).join('')
+      )}</div>`).join('');
+      body.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => {
+        pages[Number(b.dataset.go)].el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        close();
+      }));
+    },
+  });
 }
 
 load();

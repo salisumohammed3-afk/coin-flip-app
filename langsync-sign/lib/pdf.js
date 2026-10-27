@@ -122,24 +122,52 @@ async function stampField(doc, page, map, field, ctx) {
   const recipient = recipientsById[field.recipient_id];
   const textColor = hex('#111111');
 
-  if (field.type === 'signature' || field.type === 'initials') {
-    const dataUrl = field.type === 'signature' ? recipient?.signature_image : recipient?.initials_image;
-    const img = await embedDataUrl(doc, dataUrl || field.value, images);
+  if (field.type === 'signature') {
+    const img = await embedDataUrl(doc, recipient?.signature_image, images);
     if (!img) return;
-    // Reserve a sliver at the top for the "signed via" tag, as DocuSign does.
-    const tagH = field.type === 'signature' && boxH > 24 ? Math.min(6, boxH * 0.18) : 0;
-    const availH = boxH - tagH;
-    const scale = Math.min(boxW / img.width, availH / img.height);
+    // DocuSign-style frame: "Signed by:" label, the signature, and a short signer ID beneath.
+    const pad = Math.min(3, boxH * 0.08);
+    const label = boxH > 22 ? Math.min(5.5, boxH * 0.15) : 0;
+    const availH = boxH - (label ? label * 2 + pad * 3 : pad * 2);
+    const scale = Math.min((boxW - pad * 2) / img.width, availH / img.height);
     const w = img.width * scale, h = img.height * scale;
-    const pt = at(map, origin, 0, (availH - h) / 2);
-    page.drawImage(img, { ...pt, width: w, height: h, rotate: map.rotate });
-    if (tagH) {
-      const size = Math.min(tagH, 5.5);
-      const tag = `${config.appName} · ${envelopeId.slice(-8).toUpperCase()}`;
-      page.drawText(clean(tag), { ...at(map, origin, 0, boxH - size), size, font: bold, color: BRAND, rotate: map.rotate });
+    if (label) {
+      page.drawRectangle({ ...at(map, origin), width: boxW, height: boxH, borderColor: BRAND, borderWidth: 0.9, rotate: map.rotate });
+      page.drawText('Signed by:', { ...at(map, origin, pad, boxH - pad - label), size: label, font: bold, color: INK, rotate: map.rotate });
+      const id = crypto.createHash('sha256').update(`${envelopeId}:${field.recipient_id}`).digest('hex').slice(0, 15).toUpperCase();
+      page.drawText(`${id}...`, { ...at(map, origin, pad, pad), size: label * 0.9, font, color: MID_GRAY, rotate: map.rotate });
     }
+    page.drawImage(img, { ...at(map, origin, pad, label ? pad * 2 + label + (availH - h) / 2 : (boxH - h) / 2), width: w, height: h, rotate: map.rotate });
     return;
   }
+
+  if (field.type === 'initials' || field.type === 'stamp') {
+    const img = await embedDataUrl(doc, field.type === 'initials' ? recipient?.initials_image : field.value, images);
+    if (!img) return;
+    const scale = Math.min(boxW / img.width, boxH / img.height);
+    const w = img.width * scale, h = img.height * scale;
+    page.drawImage(img, { ...at(map, origin, (boxW - w) / 2, (boxH - h) / 2), width: w, height: h, rotate: map.rotate });
+    return;
+  }
+
+  if (field.type === 'radio') {
+    const s = Math.min(boxW, boxH);
+    const c = at(map, origin, s / 2, s / 2);
+    page.drawCircle({ ...c, size: s / 2, borderColor: GRAY, borderWidth: 0.8 });
+    if (field.value === 'true') page.drawCircle({ ...c, size: s / 4, color: INK });
+    return;
+  }
+
+  if (field.type === 'approve') {
+    if (field.value !== 'Approved') return;
+    const size = fitText(bold, 'APPROVED', boxW - 6, Math.min(boxH * 0.5, 11));
+    page.drawRectangle({ ...at(map, origin), width: boxW, height: boxH, borderColor: hex('#0F7A44'), borderWidth: 1.2, rotate: map.rotate });
+    const tw = bold.widthOfTextAtSize('APPROVED', size);
+    page.drawText('APPROVED', { ...at(map, origin, (boxW - tw) / 2, (boxH - size) / 2 + size * 0.15), size, font: bold, color: hex('#0F7A44'), rotate: map.rotate });
+    return;
+  }
+
+  if (field.type === 'decline') return;
 
   if (field.type === 'checkbox') {
     const s = Math.min(boxW, boxH);

@@ -137,9 +137,17 @@ export async function renderDetail(view, id) {
       placeBox(node, f);
       if (f.filled_at && (f.type === 'signature' || f.type === 'initials')) {
         // Initials images aren't sent to the list view; the signature is enough to show it's done.
-        node.innerHTML = f.type === 'signature' && r.signature_image ? html`<div class="sig-wrap"><span class="tag">LangSync Sign</span><img src="${r.signature_image}" alt=""></div>` : html`<span class="val">✓ ${FIELD_TYPES[f.type].label}</span>`;
+        node.innerHTML = f.type === 'signature' && r.signature_image ? html`<div class="signed-frame"><span class="sf-label">Signed by:</span><img src="${r.signature_image}" alt=""></div>` : html`<span class="val">✓ ${FIELD_TYPES[f.type].label}</span>`;
+      } else if (f.filled_at && f.type === 'stamp') {
+        node.innerHTML = html`<img src="${f.value}" alt="Stamp">`;
+      } else if (f.filled_at && f.type === 'approve') {
+        node.innerHTML = '<span class="approved-tag">APPROVED</span>';
       } else if (f.filled_at) {
-        node.innerHTML = f.type === 'checkbox' ? html`<span class="val">${f.value === 'true' ? '☑' : '☐'}</span>` : html`<span class="val">${f.value}</span>`;
+        node.innerHTML = ['checkbox', 'radio'].includes(f.type)
+          ? html`<span class="val">${f.value === 'true' ? (f.type === 'radio' ? '◉' : '☑') : f.type === 'radio' ? '○' : '☐'}</span>`
+          : html`<span class="val">${f.value}</span>`;
+      } else if (f.type === 'decline' || (r && ['completed'].includes(r.status))) {
+        continue;
       } else {
         node.classList.add('fld');
         node.style.setProperty('--c', r.color);

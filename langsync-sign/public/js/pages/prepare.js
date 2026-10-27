@@ -1,7 +1,7 @@
 // Step 2: place signing fields for each recipient and mark up the documents.
-import { api, html, raw, el, toast, debounce, ROLE_LABEL } from '../ui.js';
+import { api, html, raw, el, toast, debounce, ROLE_LABEL, initials } from '../ui.js';
 import { go, state } from '../app.js';
-import { renderDocuments, findPage, placeBox, FIELD_TYPES } from '../viewer.js';
+import { renderDocuments, findPage, placeBox, FIELD_TYPES, FIELD_GROUPS } from '../viewer.js';
 import { Markup, markupToolbar } from '../markup.js';
 import { stepsBar } from './edit.js';
 import { icon } from '../icons.js';
@@ -31,11 +31,18 @@ export async function renderPrepare(view, id) {
       <aside class="palette">
         <div class="mode-switch"><button class="on" data-mode="fields">Fields</button><button data-mode="markup">Markup</button></div>
         <div data-pane="fields">
-          <h3>Recipient</h3>
-          <div class="rcp-select">${raw(signers.map((r) => html`<button class="rcp-opt ${r.id === current ? 'on' : ''}" style="--c:${r.color}" data-rcp="${r.id}"><span class="sw"></span><span><div>${r.name || 'Unnamed'}</div><div class="muted small">${ROLE_LABEL[r.role]}</div></span></button>`).join(''))}</div>
-          <h3>Drag fields onto the page</h3>
-          <div data-palette>${raw(Object.entries(FIELD_TYPES).map(([type, t]) => html`<button class="pal-item" data-type="${type}"><span class="ic">${raw(t.svg ? icon(t.svg, 15) : t.icon)}</span>${t.label}</button>`).join(''))}</div>
-          <p class="muted small">Tip: click a field type, then click on the page to drop it. Drag to move, use the corner to resize, and press Delete to remove.</p>
+          <div class="fields-head"><h2>Fields</h2><button class="icon-btn" data-search-toggle title="Search fields" aria-label="Search fields">${raw(icon('search', 20))}</button></div>
+          <label class="search-box" data-search hidden>${raw(icon('search', 15))}<input type="search" placeholder="Search fields" aria-label="Search fields"></label>
+          <div class="rcp-picker">
+            <button class="rcp-pill" data-rcp-toggle aria-haspopup="listbox"></button>
+            <div class="rcp-menu" data-rcp-menu role="listbox" hidden>${raw(signers.map((r) => html`<button class="rcp-menu-item" role="option" style="--c:${r.color}" data-rcp="${r.id}"><span class="rcp-av">${initials(r.name) || '?'}</span><span><div>${r.name || 'Unnamed'}</div><div class="muted small">${ROLE_LABEL[r.role]}</div></span></button>`).join(''))}</div>
+          </div>
+          <div class="pal-divider"></div>
+          <div data-palette>${raw(FIELD_GROUPS.map(([group, types]) => html`<section class="pal-group" data-group><h4>${group}</h4><div class="pal-grid">${raw(types.map((type) => {
+            const t = FIELD_TYPES[type];
+            return html`<button class="pal-item" data-type="${type}" data-label="${t.label.toLowerCase()}" title="Drag onto the page, or click then click the page"><span class="ic">${raw(t.svg ? icon(t.svg, 16) : `<b>${t.icon}</b>`)}</span><span class="pl">${t.label}</span></button>`;
+          }).join(''))}</div></section>`).join(''))}</div>
+          <p class="muted small">Drag a field onto the page, or click it and then click where it goes. Drag to move, use the corner to resize, Delete to remove.</p>
         </div>
         <div data-pane="markup" hidden>
           <p class="muted small" style="margin-top:0">Annotate the documents before sending. Markup is shown to recipients and flattened into the final PDF.</p>
@@ -93,7 +100,12 @@ export async function renderPrepare(view, id) {
   state.cleanup.push(() => bar.reset());
 
   /* ---------------- fields ---------------- */
-  const label = (f) => `${FIELD_TYPES[f.type].label}${f.label && f.type === 'text' ? `: ${f.label}` : ''}`;
+  const label = (f) => {
+    if (f.type === 'radio') return f.options?.[0] || 'Option';
+    if (['text', 'dropdown', 'date'].includes(f.type) && f.label) return `${FIELD_TYPES[f.type].label}: ${f.label}`;
+    return FIELD_TYPES[f.type].label;
+  };
+  const NOT_REQUIRABLE = ['signature', 'date_signed', 'email', 'approve', 'decline'];
 
   function drawField(f) {
     const page = findPage(pages, f.document_id, f.page);
@@ -107,7 +119,8 @@ export async function renderPrepare(view, id) {
     }
     node.style.setProperty('--c', r?.color || '#8B36FE');
     node.title = `${label(f)} · ${r?.name || ''}`;
-    node.querySelector('.fl').innerHTML = html`${f.type === 'checkbox' ? '' : label(f)}${raw(f.required && f.type !== 'checkbox' ? '<span class="req">*</span>' : '')}`;
+    node.querySelector('.fl').innerHTML = html`${['checkbox', 'radio'].includes(f.type) ? '' : label(f)}${raw(f.required && !['checkbox', 'radio'].includes(f.type) && !NOT_REQUIRABLE.includes(f.type) ? '<span class="req">*</span>' : '')}`;
+    node.dataset.type = f.type;
     node.classList.toggle('sel', selected === f);
     placeBox(node, f);
   }
@@ -154,8 +167,16 @@ export async function renderPrepare(view, id) {
     const h = (def.h * page.aspect) / REF_WIDTH;
     const f = {
       _id: `f${++seq}`, type, document_id: page.docId, page: page.index, recipient_id: current,
-      x: clamp(fx, 0, 1 - w), y: clamp(fy, 0, 1 - h), w, h, required: type !== 'checkbox', label: '',
+      x: clamp(fx, 0, 1 - w), y: clamp(fy, 0, 1 - h), w, h, required: !['checkbox', 'radio', 'approve', 'decline'].includes(type), label: '', options: null,
     };
+    if (type === 'dropdown') f.options = ['Option 1', 'Option 2'];
+    if (type === 'radio') {
+      // New radio buttons join this recipient's most recent group, like adding another option.
+      const last = [...fields].reverse().find((x) => x.type === 'radio' && x.recipient_id === current);
+      f.label = last?.label || 'Choice 1';
+      const n = fields.filter((x) => x.type === 'radio' && x.recipient_id === current && x.label === f.label).length;
+      f.options = [`Option ${n + 1}`];
+    }
     fields.push(f);
     drawField(f);
     select(f);
@@ -193,10 +214,22 @@ export async function renderPrepare(view, id) {
     const f = selected;
     props.innerHTML = html`<h3>${FIELD_TYPES[f.type].label} field</h3>
       <label class="field"><span>Recipient</span><select data-p="recipient">${raw(signers.map((r) => html`<option value="${r.id}" ${r.id === f.recipient_id ? 'selected' : ''}>${r.name}</option>`).join(''))}</select></label>
-      ${raw(['signature', 'date_signed', 'email'].includes(f.type) ? '' : html`<label class="check"><input type="checkbox" data-p="required" ${f.required ? 'checked' : ''}><span>Required</span></label>`)}
-      ${raw(['text', 'company', 'title', 'full_name', 'checkbox'].includes(f.type) ? html`<label class="field"><span>Label / tooltip</span><input type="text" data-p="label" value="${f.label}" maxlength="120" placeholder="${f.type === 'checkbox' ? 'e.g. I agree to the terms' : 'e.g. Company number'}"></label>` : '')}
+      ${raw(NOT_REQUIRABLE.includes(f.type) ? '' : html`<label class="check"><input type="checkbox" data-p="required" ${f.required ? 'checked' : ''}><span>${f.type === 'radio' ? 'Require a choice in this group' : 'Required'}</span></label>`)}
+      ${raw(['text', 'company', 'title', 'full_name', 'checkbox', 'dropdown', 'date', 'stamp'].includes(f.type) ? html`<label class="field"><span>Label / tooltip</span><input type="text" data-p="label" value="${f.label}" maxlength="120" placeholder="${f.type === 'checkbox' ? 'e.g. I agree to the terms' : f.type === 'stamp' ? 'e.g. Company seal' : 'e.g. Company number'}"></label>` : '')}
+      ${raw(f.type === 'dropdown' ? html`<label class="field"><span>Options <span class="hint">(one per line)</span></span><textarea rows="5" data-p="options">${(f.options || []).join('\n')}</textarea></label>` : '')}
+      ${raw(f.type === 'radio' ? html`<label class="field"><span>Group name <span class="hint">(one choice per group)</span></span><input type="text" data-p="label" value="${f.label}" maxlength="120"></label><label class="field"><span>This option</span><input type="text" data-p="option" value="${f.options?.[0] || ''}" maxlength="100"></label><button class="btn ghost small" data-add-option>${raw(icon('plus', 15))}Add another option</button>` : '')}
       <div class="actions-row"><button class="btn ghost small" data-dup>Duplicate</button><button class="btn ghost small danger-text" data-del>Delete</button></div>
-      <p class="muted small" style="margin-top:14px">${f.type === 'date_signed' ? 'Filled in automatically with the date the recipient signs.' : f.type === 'email' ? 'Filled in automatically with the recipient\'s email.' : f.type === 'full_name' ? 'Pre-filled with the recipient\'s name.' : ''}</p>`;
+      <p class="muted small" style="margin-top:14px">${HELP[f.type] || ''}</p>`;
+    props.querySelector('[data-p=options]')?.addEventListener('input', (e) => { f.options = e.target.value.split('\n').map((o) => o.trim()).filter(Boolean); drawField(f); saveFields(); });
+    props.querySelector('[data-p=option]')?.addEventListener('input', (e) => { f.options = [e.target.value]; drawField(f); saveFields(); });
+    props.querySelector('[data-add-option]')?.addEventListener('click', () => {
+      const n = fields.filter((x) => x.type === 'radio' && x.recipient_id === f.recipient_id && x.label === f.label).length;
+      const copy = { ...f, _id: `f${++seq}`, options: [`Option ${n + 1}`], y: clamp(f.y + f.h * 1.8, 0, 1 - f.h) };
+      fields.push(copy);
+      drawField(copy);
+      select(copy);
+      saveFields();
+    });
     props.querySelector('[data-p=recipient]').onchange = (e) => { f.recipient_id = e.target.value; drawField(f); saveFields(); };
     props.querySelector('[data-p=required]')?.addEventListener('change', (e) => { f.required = e.target.checked; drawField(f); saveFields(); });
     props.querySelector('[data-p=label]')?.addEventListener('input', (e) => { f.label = e.target.value; drawField(f); saveFields(); });
@@ -211,13 +244,37 @@ export async function renderPrepare(view, id) {
   }
 
   /* ---------------- palette: drag or click-to-place ---------------- */
-  view.querySelectorAll('[data-rcp]').forEach((b) => (b.onclick = () => {
+  const menu = $('[data-rcp-menu]');
+  const pill = $('[data-rcp-toggle]');
+  const renderPill = () => {
+    const r = recipientById(current);
+    pill.style.setProperty('--c', r.color);
+    pill.innerHTML = html`<span class="rcp-av">${initials(r.name) || '?'}</span><span class="rcp-name">${r.name || 'Unnamed'}</span>${raw(icon('chevronDown', 18))}`;
+    view.querySelectorAll('.pal-item').forEach((p) => p.style.setProperty('--c', r.color));
+    menu.querySelectorAll('[data-rcp]').forEach((x) => x.classList.toggle('on', x.dataset.rcp === current));
+  };
+  pill.onclick = () => (menu.hidden = !menu.hidden);
+  menu.querySelectorAll('[data-rcp]').forEach((b) => (b.onclick = () => {
     current = b.dataset.rcp;
-    view.querySelectorAll('[data-rcp]').forEach((x) => x.classList.toggle('on', x === b));
-    colorPalette();
+    menu.hidden = true;
+    renderPill();
   }));
-  const colorPalette = () => view.querySelectorAll('.pal-item').forEach((p) => p.style.setProperty('--c', recipientById(current).color));
-  colorPalette();
+  const closeMenu = (e) => { if (!e.target.closest('.rcp-picker')) menu.hidden = true; };
+  document.addEventListener('pointerdown', closeMenu);
+  state.cleanup.push(() => document.removeEventListener('pointerdown', closeMenu));
+  renderPill();
+
+  // Field search, like DocuSign's magnifier in the panel header.
+  $('[data-search-toggle]').onclick = () => {
+    const box = $('[data-search]');
+    box.hidden = !box.hidden;
+    if (!box.hidden) box.querySelector('input').focus();
+  };
+  $('[data-search] input').oninput = (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    view.querySelectorAll('.pal-item').forEach((p) => (p.hidden = q && !p.dataset.label.includes(q)));
+    view.querySelectorAll('[data-group]').forEach((g) => (g.hidden = ![...g.querySelectorAll('.pal-item')].some((p) => !p.hidden)));
+  };
 
   const pageAt = (x, y) => {
     const node = document.elementsFromPoint(x, y).find((n) => n.classList?.contains('page'));
@@ -311,3 +368,15 @@ export async function renderPrepare(view, id) {
 }
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+const HELP = {
+  date_signed: 'Filled in automatically with the date the recipient signs.',
+  email: "Filled in automatically with the recipient's email.",
+  full_name: "Pre-filled with the recipient's name.",
+  date: 'The recipient picks a date from a calendar.',
+  dropdown: 'The recipient chooses one of these options.',
+  radio: 'Radio buttons with the same group name act as one question: the recipient can pick only one.',
+  approve: 'A button that approves and completes the document for this recipient, without needing a signature.',
+  decline: 'A button that lets the recipient decline. Declining cancels the envelope and notifies you.',
+  stamp: 'The recipient uploads an image of their company stamp or seal, which is placed here.',
+};
