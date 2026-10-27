@@ -38,23 +38,23 @@ function cookieString(value, maxAgeSeconds) {
   return parts.join('; ');
 }
 
-function createSession(res, userId) {
+async function createSession(res, userId) {
   const raw = token();
   const expires = new Date(Date.now() + SESSION_DAYS * 864e5).toISOString();
-  run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', sha256(raw), userId, expires);
+  await run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)', sha256(raw), userId, expires);
   res.setHeader('Set-Cookie', cookieString(raw, SESSION_DAYS * 86400));
 }
 
-function destroySession(req, res) {
+async function destroySession(req, res) {
   const raw = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-  if (raw) run('DELETE FROM sessions WHERE token_hash = ?', sha256(raw));
+  if (raw) await run('DELETE FROM sessions WHERE token_hash = ?', sha256(raw));
   res.setHeader('Set-Cookie', cookieString('', 0));
 }
 
-function currentUser(req) {
+async function currentUser(req) {
   const raw = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (!raw) return null;
-  const row = get(
+  const row = await get(
     `SELECT u.id, u.email, u.name, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`,
     sha256(raw)
   );
@@ -63,13 +63,16 @@ function currentUser(req) {
 }
 
 function requireUser(req, res, next) {
-  const user = currentUser(req);
-  if (!user) return res.status(401).json({ error: 'Please sign in.' });
-  req.user = user;
-  next();
+  currentUser(req)
+    .then((user) => {
+      if (!user) return res.status(401).json({ error: 'Please sign in.' });
+      req.user = user;
+      next();
+    })
+    .catch(next);
 }
 
-function register({ name, email, password }) {
+async function register({ name, email, password }) {
   name = String(name || '').trim();
   email = String(email || '').trim().toLowerCase();
   password = String(password || '');
@@ -79,14 +82,14 @@ function register({ name, email, password }) {
   if (config.signupDomains.length && !config.signupDomains.includes(email.split('@')[1])) {
     throw httpError(403, `Sign-ups are limited to: ${config.signupDomains.join(', ')}`);
   }
-  if (get('SELECT id FROM users WHERE email = ?', email)) throw httpError(409, 'An account with that email already exists.');
+  if (await get('SELECT id FROM users WHERE email = ?', email)) throw httpError(409, 'An account with that email already exists.');
   const id = uid('u_');
-  run('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)', id, email, name, hashPassword(password), now());
+  await run('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)', id, email, name, hashPassword(password), now());
   return { id, email, name };
 }
 
-function login({ email, password }) {
-  const user = get('SELECT * FROM users WHERE email = ?', String(email || '').trim().toLowerCase());
+async function login({ email, password }) {
+  const user = await get('SELECT * FROM users WHERE email = ?', String(email || '').trim().toLowerCase());
   if (!user || !verifyPassword(String(password || ''), user.password_hash)) throw httpError(401, 'Incorrect email or password.');
   return { id: user.id, email: user.email, name: user.name };
 }

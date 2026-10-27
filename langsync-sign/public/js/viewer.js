@@ -26,7 +26,7 @@ export async function renderDocuments(container, documents, urlFor) {
   for (const doc of documents) {
     const section = el(html`<section class="doc" data-doc="${doc.id}"><header class="doc-head"><span class="doc-icon">PDF</span><span>${doc.name}</span><span class="muted">${doc.page_count} page${doc.page_count === 1 ? '' : 's'}</span></header></section>`);
     container.append(section);
-    const pdf = await pdfjsLib.getDocument({ url: urlFor(doc), isEvalSupported: false, withCredentials: true }).promise;
+    const pdf = await pdfjsLib.getDocument({ url: urlFor(doc), isEvalSupported: false }).promise;
     for (let i = 0; i < pdf.numPages; i++) {
       const page = await pdf.getPage(i + 1);
       const vp = page.getViewport({ scale: 1 });

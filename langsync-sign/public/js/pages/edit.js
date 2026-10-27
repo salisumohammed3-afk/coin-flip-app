@@ -79,11 +79,22 @@ export async function renderEditStep(view, id) {
   };
   const uploadFiles = async (files) => {
     if (!files.length) return;
-    const form = new FormData();
-    [...files].forEach((f) => form.append('files', f));
+    files = [...files];
     savedLabel(`Uploading ${files.length} file(s)…`);
     try {
-      env = await api('POST', `/api/envelopes/${env.id}/documents`, undefined, { form });
+      // In production, files go straight to private storage via signed URLs, then get imported.
+      const plan = await api('POST', `/api/envelopes/${env.id}/uploads`, { files: files.map((f) => ({ name: f.name, type: f.type, size: f.size })) });
+      if (plan.direct) {
+        await Promise.all(plan.uploads.map(async (u, i) => {
+          const res = await fetch(u.url, { method: 'PUT', body: files[i], headers: { 'content-type': files[i].type || 'application/octet-stream', 'x-upsert': 'true' } });
+          if (!res.ok) throw new Error(`Upload of ${files[i].name} failed (${res.status}).`);
+        }));
+        env = await api('POST', `/api/envelopes/${env.id}/documents/import`, { files: plan.uploads.map((u, i) => ({ key: u.key, name: files[i].name, type: files[i].type })) });
+      } else {
+        const form = new FormData();
+        files.forEach((f) => form.append('files', f));
+        env = await api('POST', `/api/envelopes/${env.id}/documents`, undefined, { form });
+      }
       $('[data-title]').value = env.title;
       renderDocs();
       savedLabel('Uploaded ✓');

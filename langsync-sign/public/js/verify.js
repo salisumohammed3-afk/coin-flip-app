@@ -8,7 +8,7 @@ app.innerHTML = html`<div class="sign-top"><img class="lockup" src="/img/lockup.
     <div class="card card-pad rise">
       <span class="chip"><span class="chip-ic">${raw(icon('shield', 13))}</span>Document verification</span>
       <h1 style="margin-top:16px">Verify a signed document</h1>
-      <p class="muted">Check that a completed PDF came from LangSync Sign and hasn't been changed since it was signed. The file is fingerprinted (SHA-256) and compared with our records; it is not stored.</p>
+      <p class="muted">Check that a completed PDF came from LangSync Sign and hasn't been changed since it was signed. The file is fingerprinted (SHA-256) in your browser and only the fingerprint is checked; the document never leaves your device.</p>
       <label class="dropzone" data-drop><span class="tile tile-lg">${raw(icon('upload', 24))}</span><div><strong>Drop the completed PDF here</strong> or click to choose</div><input type="file" accept="application/pdf" hidden data-file></label>
       <div data-result style="margin-top:16px"></div>
     </div>
@@ -18,10 +18,11 @@ const result = app.querySelector('[data-result]');
 async function check(file) {
   if (!file) return;
   result.innerHTML = '<p class="muted">Checking…</p>';
-  const form = new FormData();
-  form.append('file', file);
   try {
-    const r = await api('POST', '/api/verify', undefined, { form });
+    // Hash locally: only the fingerprint is sent, never the document.
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const r = await api('POST', '/api/verify', { sha256 });
     result.innerHTML = r.match
       ? html`<div class="callout good">${raw(icon('checkCircle', 18))}<div><strong style="color:var(--ls-good)">Authentic and unmodified.</strong>
           <p style="margin:6px 0">"${r.envelope.title}" was completed on ${fmtDate(r.envelope.completed_at)}.</p>

@@ -14,7 +14,8 @@
     "multer": "^2.5.0",
     "nodemailer": "^10.2.1",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^4.10.38",
+    "postgres": "^3.4.9"
   },
   "private": true,
   "engines": {

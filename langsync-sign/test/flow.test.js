@@ -105,7 +105,7 @@ test('full envelope lifecycle', async () => {
   assert.equal(r.data.recipients.find((x) => x.role === 'cc').status, 'delivered');
   const alexToken = alexLink.split('/s/')[1];
   // Peek at the not-yet-active token directly to prove the server also enforces order.
-  const blairToken = require('../lib/db').get('SELECT token FROM recipients WHERE id = ?', blair.id).token;
+  const blairToken = (await require('../lib/db').get('SELECT token FROM recipients WHERE id = ?', blair.id)).token;
 
   // Access code gate.
   const signer = client();
@@ -159,10 +159,11 @@ test('full envelope lifecycle', async () => {
   fs.writeFileSync(path.join(process.env.DATA_DIR, 'final.pdf'), r.data);
 
   // Tamper-evidence check.
-  const vf = new FormData();
-  vf.append('file', new Blob([r.data], { type: 'application/pdf' }), 'final.pdf');
-  r = await (await fetch(`${base}/api/verify`, { method: 'POST', body: vf })).json();
-  assert.equal(r.match, true);
+  const hash = require('crypto').createHash('sha256').update(r.data).digest('hex');
+  r = await client()('POST', '/api/verify', { sha256: hash });
+  assert.equal(r.data.match, true);
+  r = await client()('POST', '/api/verify', { sha256: 'f'.repeat(64) });
+  assert.equal(r.data.match, false);
 
   r = await sender('GET', '/api/outbox');
   assert.ok(r.data.emails.length >= 6);

@@ -275,9 +275,9 @@ async function renderLibrary(view, query) {
   const load = async () => {
     const { documents, completed } = await api('GET', `/api/library?q=${encodeURIComponent(view.querySelector('[data-q]').value)}`);
     view.querySelector('[data-completed]').innerHTML = completed.length
-      ? html`<table class="list"><thead><tr><th>Agreement</th><th class="hide-sm">Completed</th><th class="hide-sm">Size</th><th></th></tr></thead><tbody>${raw(completed.map((c) => html`<tr>
+      ? html`<table class="list"><thead><tr><th>Agreement</th><th class="hide-sm">Completed</th><th class="hide-sm">Contents</th><th></th></tr></thead><tbody>${raw(completed.map((c) => html`<tr>
           <td><div class="t-title"><span class="doc-icon">PDF</span>${c.title}</div><div class="t-sub mono">SHA-256 ${c.final_sha256.slice(0, 24)}…</div></td>
-          <td class="hide-sm">${fmtDate(c.completed_at)}</td><td class="hide-sm">${fmtSize(c.size)}</td>
+          <td class="hide-sm">${fmtDate(c.completed_at)}</td><td class="hide-sm">PDF + certificate</td>
           <td style="text-align:right;white-space:nowrap"><a class="btn ghost small" href="/api/envelopes/${c.envelope_id}/download?inline=1" target="_blank" rel="noopener">${raw(icon('eye', 15))}View</a> <a class="btn primary small" href="/api/envelopes/${c.envelope_id}/download">${raw(icon('download', 15))}Download</a></td></tr>`).join(''))}</tbody></table>`
       : emptyState('folder', 'No completed agreements yet', 'Signed documents appear here automatically.');
     view.querySelector('[data-docs]').innerHTML = documents.length
