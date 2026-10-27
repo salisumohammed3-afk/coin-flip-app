@@ -316,6 +316,11 @@ async function renderOutbox(view) {
 (async function boot() {
   state.config = await api('GET', '/api/config');
   document.title = state.config.appName;
+  if (state.config.setupRequired) {
+    app.innerHTML = html`<div class="center-wrap field-texture"><div class="card center-card"><span class="tile tile-lg tile-warn">${raw(icon('alert', 24))}</span>
+      <h1>Almost there</h1><p class="muted">LangSync Sign is deployed but not connected to its database and storage yet. Add <span class="mono">DATABASE_URL</span>, <span class="mono">SUPABASE_URL</span> and <span class="mono">SUPABASE_SERVICE_ROLE_KEY</span> in Vercel, then redeploy.</p></div></div>`;
+    return;
+  }
   state.user = (await api('GET', '/api/auth/me')).user;
   if (state.user) {
     api('GET', '/api/stats').then((s) => (counts = s.counts)).catch(() => {});

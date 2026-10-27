@@ -3,7 +3,8 @@
 const path = require('path');
 const crypto = require('crypto');
 
-const dataDir = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+// Serverless file systems are read-only except /tmp; production data lives in Postgres + Supabase Storage.
+const dataDir = path.resolve(process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/langsync-sign' : path.join(__dirname, '..', 'data')));
 const port = Number(process.env.PORT || 3000);
 const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -43,5 +44,7 @@ module.exports = {
     : null,
   mailFrom: process.env.MAIL_FROM || 'LangSync Sign <sign@langsync.local>',
   replyTo: process.env.MAIL_REPLY_TO || '',
+  // On Vercel, refuse to run on throwaway local storage: everything must be in Supabase.
+  setupRequired: Boolean(process.env.VERCEL) && !(process.env.DATABASE_URL && supabaseUrl && serviceKey),
   secureCookies: (process.env.BASE_URL || '').startsWith('https://') || Boolean(process.env.VERCEL),
 };

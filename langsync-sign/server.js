@@ -35,6 +35,12 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '4mb' }));
 
+// A deployment without its database/storage secrets must not silently use throwaway storage.
+app.use('/api', (req, res, next) => {
+  if (!config.setupRequired || req.path === '/config') return next();
+  res.status(503).json({ error: 'LangSync Sign is not configured yet: set DATABASE_URL, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, then redeploy.' });
+});
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.maxUploadMb * 1024 * 1024, files: 10 } });
 
 // Express 4 doesn't catch rejected promises; route every async handler through this.
@@ -171,8 +177,8 @@ async function sendStored(res, key, name, asAttachment) {
 app.get('/api/config', wrap(async (req, res) => {
   res.json({
     appName: config.appName, smtpEnabled, emailProvider: provider, allowSignup: config.allowSignup,
-    signupDomains: config.signupDomains, hasUsers: !!(await get('SELECT 1 AS x FROM users LIMIT 1')),
-    directUploads: Boolean(storage.signedUploadUrl), maxUploadMb: config.maxUploadMb,
+    signupDomains: config.signupDomains, hasUsers: config.setupRequired ? false : !!(await get('SELECT 1 AS x FROM users LIMIT 1')),
+    directUploads: Boolean(storage.signedUploadUrl), maxUploadMb: config.maxUploadMb, setupRequired: config.setupRequired,
   });
 }));
 

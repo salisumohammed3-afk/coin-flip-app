@@ -166,7 +166,14 @@ test('full envelope lifecycle', async () => {
   assert.equal(r.data.match, false);
 
   r = await sender('GET', '/api/outbox');
-  assert.ok(r.data.emails.length >= 6);
+  const subjects = r.data.emails.map((m) => `${m.to_email}: ${m.subject}`);
+  const has = (to, re) => assert.ok(subjects.some((s) => s.startsWith(to) && re.test(s)), `${to} should get ${re}\n${subjects.join('\n')}`);
+  has('alex@client.test', /received a new legal document/);
+  has('casey@client.test', /copied on/);
+  has('alex@client.test', /^alex@client.test: You signed/);
+  has('sal@langsync.test', /Alex Signer signed/);
+  has('blair@client.test', /received a new legal document/);
+  for (const to of ['alex@client.test', 'blair@client.test', 'casey@client.test', 'sal@langsync.test']) has(to, /Completed/);
 
   // Templates and duplicates.
   r = await sender('POST', `/api/envelopes/${id}/duplicate`, { template: true });

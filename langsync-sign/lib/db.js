@@ -61,6 +61,7 @@ function makePostgres() {
   const postgres = require('postgres');
   const sql = postgres(config.databaseUrl, {
     max: 3,
+    ssl: /localhost|127\.0\.0\.1/.test(config.databaseUrl) ? false : 'require',
     prepare: false, // required by Supabase's transaction pooler
     idle_timeout: 20,
     connection: { search_path: 'sign' },
