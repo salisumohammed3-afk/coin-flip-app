@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "node scripts/build.js",
+  "outputDirectory": "public",
+  "regions": ["lhr1"],
+  "functions": {
+    "api/index.js": { "maxDuration": 60, "memory": 1024, "includeFiles": "db/**" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/s/:token", "destination": "/sign.html" },
+    { "source": "/verify", "destination": "/verify.html" }
+  ],
+  "crons": [{ "path": "/api/cron/sweep", "schedule": "0 7 * * *" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://bpgeqyhlghwzanwxntub.supabase.co; frame-ancestors 'none'"
+        }
+      ]
+    },
+    { "source": "/s/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }] }
+  ]
+}
