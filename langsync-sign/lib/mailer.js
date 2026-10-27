@@ -159,4 +159,54 @@ async function sendMail({ envelopeId = null, ownerId = null, to, toName = '', su
   return { id, status, html };
 }
 
-module.exports = { sendMail, render, smtpEnabled: Boolean(provider), provider };
+// The real LangSync lockup, served from the hub like every other product's emails.
+const LOGO = 'https://hub.langsync.ai/langsync-lockup.png';
+
+/**
+ * Emails a six-digit sign-in code, in the same layout every LangSync product uses.
+ * Never written to the outbox. The code is one unbroken string so copying it gives six digits.
+ */
+async function sendCode(email, code) {
+  const subject = `${code} is your LangSync Sign sign-in code`;
+  if (!provider) {
+    console.log(`[mail] (no email provider configured) sign-in code for ${email}: ${code}`);
+    return;
+  }
+  const text = [
+    'Sign in to LangSync Sign', '',
+    `Your sign-in code is: ${code}`, '',
+    'Enter it in the LangSync Sign tab you opened. It works once and expires in 10 minutes.',
+    'If you did not ask for it, you can ignore this email.',
+  ].join('\n');
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5f7fb;font-family:${FONT};color:${C.ink}">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px">
+      <tr><td align="center">
+        <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid ${C.line};border-radius:16px;padding:36px">
+          <tr><td>
+            <img src="${LOGO}" alt="LangSync" width="102" height="30" style="display:block;width:102px;height:30px;border:0" />
+            <div style="height:22px"></div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;line-height:1.25">Sign in to LangSync Sign</div>
+            <div style="height:8px"></div>
+            <p style="margin:0;font-size:15px;line-height:1.6;color:${C.muted}">Enter this code in the LangSync Sign tab you just opened.</p>
+            <div style="height:24px"></div>
+            <div style="background:#f4f8ff;border:1px solid #d9e9fb;border-radius:12px;padding:18px 20px;text-align:center">
+              <div style="font-family:${DISPLAY};font-size:34px;font-weight:700;letter-spacing:10px;color:${C.brandInk}">${code}</div>
+            </div>
+            <div style="height:22px"></div>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#8a93a2">It works once and expires in 10 minutes.</p>
+            <div style="height:22px"></div>
+            <div style="border-top:1px solid ${C.line}"></div>
+            <div style="height:16px"></div>
+            <p style="margin:0;font-size:12px;color:#8a93a2">If you did not ask for this, you can safely ignore it.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+  await deliver({ to: email, subject, html, text });
+}
+
+module.exports = { sendMail, sendCode, render, smtpEnabled: Boolean(provider), provider };

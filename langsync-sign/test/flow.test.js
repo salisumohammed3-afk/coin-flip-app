@@ -12,6 +12,11 @@ delete process.env.SMTP_HOST;
 
 const { PDFDocument, StandardFonts } = require('pdf-lib');
 const app = require('../server');
+const auth = require('../lib/auth');
+
+// Capture sign-in codes instead of emailing them.
+const codes = {};
+auth.setCodeSender(async (email, code) => { codes[email] = code; });
 
 const PNG_SIG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -24,6 +29,14 @@ test.before(async () => {
   base = `http://127.0.0.1:${server.address().port}`;
 });
 test.after(() => server.close());
+
+async function signIn(call, email) {
+  let r = await call('POST', '/api/auth/code', { email });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  r = await call('POST', '/api/auth/verify', { email, code: codes[email] });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  return r;
+}
 
 function client() {
   let cookie = '';
@@ -52,8 +65,8 @@ async function samplePdf(pages = 2) {
 
 test('full envelope lifecycle', async () => {
   const sender = client();
-  let r = await sender('POST', '/api/auth/register', { name: 'Sal Sender', email: 'sal@langsync.test', password: 'password123' });
-  assert.equal(r.status, 200, JSON.stringify(r.data));
+  let r = await signIn(sender, 'sal@langsync.test');
+  assert.equal(r.data.user.name, 'Sal');
 
   r = await sender('POST', '/api/envelopes', { title: 'Untitled envelope' });
   const id = r.data.id;
@@ -185,14 +198,14 @@ test('full envelope lifecycle', async () => {
 
   // Other users can't see this envelope.
   const other = client();
-  await other('POST', '/api/auth/register', { name: 'Other', email: 'other@langsync.test', password: 'password123' });
+  await signIn(other, 'other@langsync.test');
   r = await other('GET', `/api/envelopes/${id}`);
   assert.equal(r.status, 404);
 });
 
 test('decline and void', async () => {
   const sender = client();
-  await sender('POST', '/api/auth/register', { name: 'Dee', email: 'dee@langsync.test', password: 'password123' });
+  await signIn(sender, 'dee@langsync.test');
   const make = async () => {
     const env = (await sender('POST', '/api/envelopes', {})).data;
     const form = new FormData();
@@ -223,4 +236,23 @@ test('decline and void', async () => {
   assert.equal(r.status, 200, JSON.stringify(r.data));
   r = await s('GET', `/api/sign/${c.token}`);
   assert.equal(r.status, 404);
+});
+
+test('sign-in codes', async () => {
+  const call = client();
+  const email = 'codes@langsync.test';
+  await call('POST', '/api/auth/code', { email });
+  const wrong = codes[email] === '000000' ? '111111' : '000000';
+  let r = await call('POST', '/api/auth/verify', { email, code: wrong });
+  assert.equal(r.status, 400);
+  assert.match(r.data.error, /4 tries left/);
+  // Asking again straight away is refused.
+  r = await call('POST', '/api/auth/code', { email });
+  assert.equal(r.status, 429);
+  // A pasted code with spaces still works, and only once.
+  r = await call('POST', '/api/auth/verify', { email, code: codes[email].split('').join(' ') });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  r = await call('POST', '/api/auth/verify', { email, code: codes[email] });
+  assert.equal(r.status, 400);
+  assert.equal((await call('GET', '/api/auth/me')).data.user.email, email);
 });

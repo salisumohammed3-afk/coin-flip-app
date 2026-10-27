@@ -182,14 +182,13 @@ app.get('/api/config', wrap(async (req, res) => {
   });
 }));
 
-app.post('/api/auth/register', wrap(async (req, res) => {
-  const user = await auth.register(req.body || {});
-  await auth.createSession(res, user.id);
-  res.json({ user });
+app.post('/api/auth/code', wrap(async (req, res) => {
+  await auth.requestCode(req.body || {});
+  res.json({ ok: true });
 }));
 
-app.post('/api/auth/login', wrap(async (req, res) => {
-  const user = await auth.login(req.body || {});
+app.post('/api/auth/verify', wrap(async (req, res) => {
+  const user = await auth.verifyCode(req.body || {});
   await auth.createSession(res, user.id);
   res.json({ user });
 }));

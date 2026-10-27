@@ -112,23 +112,22 @@ setInterval(poll, 10000);
 
 /* -------------------------------- auth --------------------------------- */
 
-function renderAuth(mode = state.config?.hasUsers ? 'login' : 'register') {
-  const isLogin = mode === 'login';
+function renderAuth(step = 'email', email = '') {
+  const isCode = step === 'code';
   const d = (ms) => raw(`style="animation-delay:${ms}ms"`);
   app.innerHTML = html`<main class="auth">
     <section class="auth-main">
       <div class="rise" ${d(40)}>${raw(lockup(32))}</div>
       <div class="center"><form novalidate>
-        <p class="eyebrow rise" ${d(120)}>${isLogin ? 'Welcome back' : 'Get started'}</p>
-        <h1 class="rise" ${d(180)}>${isLogin ? 'Sign in to' : 'Create your'}<br>${isLogin ? 'LangSync Sign' : 'Sign account'}</h1>
-        <p class="lead rise" ${d(240)}>${isLogin ? 'Send, sign and track agreements. Enter the email and password for your LangSync Sign account.' : 'Sender accounts are for the LangSync team. Recipients never need an account to sign.'}</p>
+        <h1 class="rise" ${d(180)}>${isCode ? 'Check your' : 'Sign in to'}<br>${isCode ? 'email' : 'LangSync Sign'}</h1>
+        <p class="lead rise" ${d(240)}>${isCode ? raw(html`We sent a six-digit code to <strong>${email}</strong>. Enter it below.`) : 'Send, sign and track agreements. Enter your email and we will send you a sign-in code.'}</p>
         <div class="fields rise" ${d(300)}>
-          ${raw(isLogin ? '' : '<label class="field"><span>Full name</span><input name="name" type="text" autocomplete="name" placeholder="Your name" required></label>')}
-          <label class="field"><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="you@company.com" required></label>
-          <label class="field"><span>Password</span><input name="password" type="password" autocomplete="${isLogin ? 'current-password' : 'new-password'}" placeholder="${isLogin ? 'Your password' : 'At least 8 characters'}" required minlength="8"></label>
+          ${raw(isCode
+            ? '<label class="field"><span>Sign-in code</span><input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" class="code-input" required></label>'
+            : '<label class="field"><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="you@company.com" required></label>')}
           <div class="err"></div>
-          <button class="btn primary">${isLogin ? 'Sign in' : 'Create account'}</button>
-          ${raw(state.config?.allowSignup || !isLogin ? html`<p class="small" style="text-align:center;margin-top:16px"><span class="muted">${isLogin ? 'New to LangSync Sign?' : 'Already have an account?'}</span> <a href="#" class="text-link" data-switch>${isLogin ? 'Create an account' : 'Sign in'}</a></p>` : '')}
+          <button class="btn primary">${isCode ? 'Sign in' : 'Email me a sign-in code'}</button>
+          ${raw(isCode ? '<p class="small" style="text-align:center;margin-top:16px"><a href="#" class="text-link" data-resend>Resend code</a> <span class="muted">or</span> <a href="#" class="text-link" data-back>use a different email</a></p>' : '')}
         </div>
       </form></div>
       <p class="foot">Access is by invitation. Ask your LangSync contact to be added.</p>
@@ -147,18 +146,51 @@ function renderAuth(mode = state.config?.hasUsers ? 'login' : 'register') {
     </aside>
   </main>`;
   const form = app.querySelector('form');
-  app.querySelector('[data-switch]')?.addEventListener('click', (e) => { e.preventDefault(); renderAuth(isLogin ? 'register' : 'login'); });
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(form));
+  const err = form.querySelector('.err');
+  const button = form.querySelector('button');
+  const input = form.querySelector('input');
+  input.focus();
+
+  const send = async (to) => {
+    err.textContent = '';
+    button.disabled = true;
     try {
-      const { user } = await api('POST', `/api/auth/${isLogin ? 'login' : 'register'}`, data);
+      await api('POST', '/api/auth/code', { email: to });
+      renderAuth('code', to);
+    } catch (e) {
+      err.textContent = e.message;
+      button.disabled = false;
+    }
+  };
+  const verify = async (code) => {
+    err.textContent = '';
+    button.disabled = true;
+    try {
+      const { user } = await api('POST', '/api/auth/verify', { email, code });
       state.user = user;
       poll();
       route();
-    } catch (err) {
-      form.querySelector('.err').textContent = err.message;
+    } catch (e) {
+      err.textContent = e.message;
+      button.disabled = false;
+      if (/expired|Too many/.test(e.message)) input.value = '';
     }
+  };
+
+  if (isCode) {
+    // No maxlength: a pasted "1 2 3 4 5 6" must survive. Keep the digits, take six, submit when complete.
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D/g, '').slice(0, 6);
+      input.value = digits;
+      if (digits.length === 6) verify(digits);
+    });
+    app.querySelector('[data-resend]').addEventListener('click', (e) => { e.preventDefault(); send(email); });
+    app.querySelector('[data-back]').addEventListener('click', (e) => { e.preventDefault(); renderAuth(); });
+  }
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    if (isCode) verify(input.value.replace(/\D/g, ''));
+    else send(input.value.trim());
   };
 }
 

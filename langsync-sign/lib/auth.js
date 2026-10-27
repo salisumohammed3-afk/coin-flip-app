@@ -7,19 +7,9 @@ const config = require('./config');
 const SESSION_COOKIE = 'lss_session';
 const SESSION_DAYS = 14;
 
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.scryptSync(password, salt, 64);
-  return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
-}
-
-function verifyPassword(password, stored) {
-  const [scheme, saltB64, hashB64] = String(stored).split('$');
-  if (scheme !== 'scrypt') return false;
-  const expected = Buffer.from(hashB64, 'base64');
-  const actual = crypto.scryptSync(password, Buffer.from(saltB64, 'base64'), expected.length);
-  return crypto.timingSafeEqual(expected, actual);
-}
+const CODE_MINUTES = 10;
+const CODE_MAX_ATTEMPTS = 5;
+const CODE_RESEND_SECONDS = 30;
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -72,26 +62,62 @@ function requireUser(req, res, next) {
     .catch(next);
 }
 
-async function register({ name, email, password }) {
-  name = String(name || '').trim();
-  email = String(email || '').trim().toLowerCase();
-  password = String(password || '');
-  if (!config.allowSignup) throw httpError(403, 'Sign-ups are disabled. Ask an admin for an account.');
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, 'Enter your name and a valid email.');
-  if (password.length < 8) throw httpError(400, 'Password must be at least 8 characters.');
-  if (config.signupDomains.length && !config.signupDomains.includes(email.split('@')[1])) {
-    throw httpError(403, `Sign-ups are limited to: ${config.signupDomains.join(', ')}`);
-  }
-  if (await get('SELECT id FROM users WHERE email = ?', email)) throw httpError(409, 'An account with that email already exists.');
-  const id = uid('u_');
-  await run('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)', id, email, name, hashPassword(password), now());
-  return { id, email, name };
+// Emails the code. Swappable so tests can read the code without a mail provider.
+let codeSender = async (email, code) => require('./mailer').sendCode(email, code);
+function setCodeSender(fn) { codeSender = fn; }
+
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
+/** Who may sign in: anyone who already has an account, or a new address on an allowed domain. */
+async function mayEnter(email) {
+  if (await get('SELECT id FROM users WHERE email = ?', email)) return true;
+  if (!config.allowSignup) return false;
+  return !config.signupDomains.length || config.signupDomains.includes(email.split('@')[1]);
 }
 
-async function login({ email, password }) {
-  const user = await get('SELECT * FROM users WHERE email = ?', String(email || '').trim().toLowerCase());
-  if (!user || !verifyPassword(String(password || ''), user.password_hash)) throw httpError(401, 'Incorrect email or password.');
-  return { id: user.id, email: user.email, name: user.name };
+/**
+ * Step one: email a six-digit sign-in code. Answers the same way whether or not the
+ * address may sign in, so it never reveals who has an account.
+ */
+async function requestCode({ email }) {
+  email = normalizeEmail(email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(400, 'Enter a valid email.');
+  if (!(await mayEnter(email))) return;
+  const pending = await get('SELECT created_at FROM login_codes WHERE email = ?', email);
+  if (pending && Date.now() - Date.parse(pending.created_at) < CODE_RESEND_SECONDS * 1000) {
+    throw httpError(429, 'A code was just sent. Wait a few seconds before asking for another.');
+  }
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const expires = new Date(Date.now() + CODE_MINUTES * 60e3).toISOString();
+  await run('DELETE FROM login_codes WHERE email = ?', email);
+  await run('INSERT INTO login_codes (email, code_hash, attempts, created_at, expires_at) VALUES (?, ?, 0, ?, ?)', email, sha256(code), now(), expires);
+  await codeSender(email, code);
+}
+
+/** Step two: check the code. A first sign-in creates the account. */
+async function verifyCode({ email, code }) {
+  email = normalizeEmail(email);
+  code = String(code || '').replace(/\D/g, '');
+  const row = await get('SELECT * FROM login_codes WHERE email = ?', email);
+  if (!row || row.expires_at < now()) throw httpError(400, 'Your code expired. Request a new one.');
+  if (code.length !== 6 || sha256(code) !== row.code_hash) {
+    const attempts = row.attempts + 1;
+    if (attempts >= CODE_MAX_ATTEMPTS) {
+      await run('DELETE FROM login_codes WHERE email = ?', email);
+      throw httpError(400, 'Too many attempts. Request a new code.');
+    }
+    await run('UPDATE login_codes SET attempts = ? WHERE email = ?', attempts, email);
+    const left = CODE_MAX_ATTEMPTS - attempts;
+    throw httpError(400, `Incorrect code. ${left} ${left === 1 ? 'try' : 'tries'} left.`);
+  }
+  await run('DELETE FROM login_codes WHERE email = ?', email);
+  const user = await get('SELECT id, email, name FROM users WHERE email = ?', email);
+  if (user) return user;
+  if (!(await mayEnter(email))) throw httpError(403, 'This email cannot sign in to LangSync Sign.');
+  const id = uid('u_');
+  const name = email.split('@')[0].split(/[._-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || email;
+  await run('INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)', id, email, name, now());
+  return { id, email, name };
 }
 
 function httpError(status, message) {
@@ -100,4 +126,4 @@ function httpError(status, message) {
   return err;
 }
 
-module.exports = { createSession, destroySession, currentUser, requireUser, register, login, httpError, hashPassword };
+module.exports = { createSession, destroySession, currentUser, requireUser, requestCode, verifyCode, setCodeSender, httpError };
